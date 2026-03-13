@@ -20,6 +20,8 @@ const state = {
 
 const searchView = document.getElementById("searchView");
 const resultsView = document.getElementById("resultsView");
+const appShell = document.querySelector(".app-shell");
+const paneResizer = document.getElementById("paneResizer");
 const form = document.getElementById("controlsForm");
 const runBtn = document.getElementById("runBtn");
 const jsonBtn = document.getElementById("jsonBtn");
@@ -51,6 +53,59 @@ const COLLECTION_PALETTE = [
     "#bcbd22",
     "#17becf"
 ];
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function initPaneResizer() {
+    if (!appShell || !paneResizer) {
+        return;
+    }
+
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    const onPointerMove = (event) => {
+        if (!isResizing) {
+            return;
+        }
+
+        const deltaX = event.clientX - startX;
+        const viewportMax = Math.max(520, window.innerWidth - 360);
+        const nextWidth = clamp(startWidth + deltaX, 420, viewportMax);
+        appShell.style.setProperty("--left-pane-width", `${nextWidth}px`);
+    };
+
+    const stopResizing = () => {
+        if (!isResizing) {
+            return;
+        }
+
+        isResizing = false;
+        document.body.classList.remove("resizing");
+        window.removeEventListener("pointermove", onPointerMove);
+        window.removeEventListener("pointerup", stopResizing);
+        window.removeEventListener("pointercancel", stopResizing);
+    };
+
+    paneResizer.addEventListener("pointerdown", (event) => {
+        if (window.matchMedia("(max-width: 1024px)").matches) {
+            return;
+        }
+
+        event.preventDefault();
+        isResizing = true;
+        startX = event.clientX;
+        startWidth = document.querySelector(".controls-panel")?.getBoundingClientRect().width || 620;
+
+        document.body.classList.add("resizing");
+        window.addEventListener("pointermove", onPointerMove);
+        window.addEventListener("pointerup", stopResizing);
+        window.addEventListener("pointercancel", stopResizing);
+    });
+}
 
 function setStatus(text) {
     statusLine.textContent = text;
@@ -378,3 +433,4 @@ newSearchBtn.addEventListener("click", () => {
 setStatus("Idle");
 setProgress("Ready. Load AIS CSV to begin.");
 showSearchView();
+initPaneResizer();
