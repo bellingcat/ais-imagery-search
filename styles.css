@@ -78,6 +78,10 @@ body {
   overflow: auto;
 }
 
+.hidden {
+  display: none;
+}
+
 .controls-panel h1 {
   margin: 0 0 8px;
   line-height: 1.15;
@@ -150,6 +154,79 @@ button:disabled {
   margin-top: 16px;
   border-top: 1px solid rgba(18, 38, 32, 0.12);
   padding-top: 12px;
+}
+
+.results-header p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.results-table-wrap {
+  margin-top: 14px;
+  border: 1px solid rgba(18, 38, 32, 0.15);
+  border-radius: 10px;
+  overflow: auto;
+  max-height: 52vh;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.results-table th,
+.results-table td {
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid rgba(18, 38, 32, 0.1);
+  vertical-align: top;
+}
+
+.results-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #ecf2ed;
+  font-weight: 700;
+}
+
+.results-table tbody tr {
+  cursor: pointer;
+}
+
+.results-table tbody tr:hover {
+  background: rgba(47, 111, 94, 0.1);
+}
+
+.results-table tbody tr.active {
+  background: rgba(200, 76, 9, 0.17);
+}
+
+.legend {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(18, 38, 32, 0.12);
+  border-radius: 999px;
+  padding: 4px 8px;
+}
+
+.legend-swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1px solid rgba(18, 38, 32, 0.3);
 }
 
 h2 {

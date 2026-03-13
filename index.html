@@ -16,12 +16,13 @@
 
   <main class="app-shell">
     <section class="panel controls-panel">
-      <header>
-        <h1>AIS to STAC Strict Matcher</h1>
-        <p>Upload AIS CSV, query STAC by track chunks, then shortlist by temporal and spatial first-match checks.</p>
-      </header>
+      <section id="searchView">
+        <header>
+          <h1>AIS to STAC Strict Matcher</h1>
+          <p>Upload AIS CSV, query STAC by track chunks, then shortlist by temporal and spatial first-match checks.</p>
+        </header>
 
-      <form id="controlsForm" class="controls-grid">
+        <form id="controlsForm" class="controls-grid">
         <label>
           AIS CSV
           <input id="csvFile" type="file" accept=".csv,text/csv" required />
@@ -29,22 +30,22 @@
 
         <label>
           Longitude column
-          <input id="lonColumn" type="text" value="lon" required />
+          <input id="lonColumn" type="text" value="Lng" required />
         </label>
 
         <label>
           Latitude column
-          <input id="latColumn" type="text" value="lat" required />
+          <input id="latColumn" type="text" value="Lat" required />
         </label>
 
         <label>
           Time column
-          <input id="timeColumn" type="text" value="timestamp" required />
+          <input id="timeColumn" type="text" value="Date/Time" required />
         </label>
 
         <label>
           Collections (comma-separated)
-          <input id="collections" type="text" value="sentinel-1-grd" required />
+          <input id="collections" type="text" value="sentinel-2-l2a" required />
         </label>
 
         <label class="span-2">
@@ -87,27 +88,64 @@
           <input id="maxItems" type="number" value="1200" min="1" step="1" required />
         </label>
 
-        <div class="actions span-2">
-          <button id="runBtn" type="submit">Run Matching</button>
+          <div class="actions span-2">
+            <button id="runBtn" type="submit">Run Matching</button>
+          </div>
+        </form>
+
+        <section class="status" aria-live="polite">
+          <h2>Status</h2>
+          <p id="statusLine">Idle</p>
+          <p id="progressLine">No active run.</p>
+        </section>
+
+        <section class="metrics">
+          <h2>Metrics</h2>
+          <ul>
+            <li>AIS points: <strong id="metricPoints">0</strong></li>
+            <li>Chunks: <strong id="metricChunks">0</strong></li>
+            <li>Unique candidates: <strong id="metricCandidates">0</strong></li>
+            <li>Shortlist count: <strong id="metricShortlist">0</strong></li>
+          </ul>
+        </section>
+      </section>
+
+      <section id="resultsView" class="hidden">
+        <header class="results-header">
+          <h1>Results</h1>
+          <p>Hover or click a footprint on the map to jump to its row in the table.</p>
+        </header>
+
+        <div class="actions">
+          <button id="newSearchBtn" type="button">New Search</button>
           <button id="jsonBtn" type="button" disabled>Download JSON</button>
           <button id="csvBtn" type="button" disabled>Download CSV</button>
         </div>
-      </form>
 
-      <section class="status" aria-live="polite">
-        <h2>Status</h2>
-        <p id="statusLine">Idle</p>
-        <p id="progressLine">No active run.</p>
-      </section>
+        <section class="metrics">
+          <h2>Results Metrics</h2>
+          <ul>
+            <li>Candidate features: <strong id="resultCandidates">0</strong></li>
+            <li>Matched shortlist: <strong id="resultShortlist">0</strong></li>
+          </ul>
+          <div id="resultsLegend" class="legend"></div>
+        </section>
 
-      <section class="metrics">
-        <h2>Metrics</h2>
-        <ul>
-          <li>AIS points: <strong id="metricPoints">0</strong></li>
-          <li>Chunks: <strong id="metricChunks">0</strong></li>
-          <li>Unique candidates: <strong id="metricCandidates">0</strong></li>
-          <li>Shortlist count: <strong id="metricShortlist">0</strong></li>
-        </ul>
+        <section class="results-table-wrap" aria-label="Results table">
+          <table class="results-table" id="resultsTable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Collection</th>
+                <th>Datetime</th>
+                <th>Platform</th>
+                <th>Matched AIS Time</th>
+                <th>Imagery</th>
+              </tr>
+            </thead>
+            <tbody id="resultsTbody"></tbody>
+          </table>
+        </section>
       </section>
     </section>
 
