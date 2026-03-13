@@ -1,0 +1,195 @@
+:root {
+  --bg-a: #f7f4ed;
+  --bg-b: #e8efe9;
+  --ink: #122620;
+  --muted: #48635b;
+  --panel: rgba(255, 255, 255, 0.82);
+  --panel-border: rgba(18, 38, 32, 0.15);
+  --accent: #c84c09;
+  --accent-2: #2f6f5e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  color: var(--ink);
+  min-height: 100vh;
+  background: radial-gradient(circle at 12% 10%, #fff4e4 0%, transparent 36%),
+    radial-gradient(circle at 85% 92%, #dcefe6 0%, transparent 38%),
+    linear-gradient(140deg, var(--bg-a), var(--bg-b));
+}
+
+.bg-shape {
+  position: fixed;
+  z-index: -1;
+  border-radius: 999px;
+  filter: blur(40px);
+  opacity: 0.35;
+  animation: drift 8s ease-in-out infinite alternate;
+}
+
+.bg-shape-a {
+  width: 340px;
+  height: 340px;
+  top: -60px;
+  right: -80px;
+  background: #ffa166;
+}
+
+.bg-shape-b {
+  width: 300px;
+  height: 300px;
+  left: -90px;
+  bottom: -120px;
+  background: #6cb8a1;
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(12px, -10px, 0);
+  }
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: minmax(340px, 480px) 1fr;
+  gap: 18px;
+  padding: 18px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 30px rgba(18, 38, 32, 0.09);
+}
+
+.controls-panel {
+  padding: 20px;
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+}
+
+.controls-panel h1 {
+  margin: 0 0 8px;
+  line-height: 1.15;
+}
+
+.controls-panel p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.controls-grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+input {
+  font: inherit;
+  padding: 10px 11px;
+  border-radius: 10px;
+  border: 1px solid rgba(18, 38, 32, 0.2);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+input:focus {
+  outline: 2px solid rgba(200, 76, 9, 0.25);
+  border-color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 13px;
+  font: 600 0.9rem "Space Grotesk", sans-serif;
+  background: var(--accent-2);
+  color: #f5fff9;
+  cursor: pointer;
+}
+
+button:hover:enabled {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+#runBtn {
+  background: var(--accent);
+}
+
+.status,
+.metrics {
+  margin-top: 16px;
+  border-top: 1px solid rgba(18, 38, 32, 0.12);
+  padding-top: 12px;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 0.97rem;
+}
+
+.status p,
+.metrics li {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.84rem;
+}
+
+.metrics ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.map-panel {
+  min-height: calc(100vh - 36px);
+  overflow: hidden;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+@media (max-width: 1024px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .controls-panel,
+  .map-panel {
+    max-height: none;
+    min-height: 420px;
+  }
+}
