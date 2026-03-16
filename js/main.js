@@ -266,7 +266,7 @@ function setHighlightedRow(featureId, shouldScroll) {
     }
 }
 
-function rerenderMap(shouldFit = false) {
+function rerenderMap(shouldFit = false, flyToHighlight = false) {
     renderMapData(map, {
         points: state.points,
         candidates: state.shortlistedFeatures,
@@ -281,7 +281,8 @@ function rerenderMap(shouldFit = false) {
             setHighlightedRow(featureId, true);
             rerenderMap();
         },
-        shouldFit
+        shouldFit,
+        flyToHighlight
     });
 }
 
@@ -343,7 +344,7 @@ function renderResultsTable(rows) {
         tr.addEventListener("click", () => {
             state.highlightedFeatureId = row.id;
             setHighlightedRow(row.id, false);
-            rerenderMap();
+            rerenderMap(false, true);
         });
 
         resultsTbody.appendChild(tr);

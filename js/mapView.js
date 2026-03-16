@@ -155,13 +155,51 @@ function fitToData(map, features) {
     map.fitBounds([[minX, minY], [maxX, maxY]], { padding: 40, duration: 600 });
 }
 
+function centerOfGeometry(geom) {
+    if (!geom) {
+        return null;
+    }
+
+    if (geom.type === "Point" && Array.isArray(geom.coordinates) && geom.coordinates.length >= 2) {
+        return [geom.coordinates[0], geom.coordinates[1]];
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    const collectCoord = (coord) => {
+        minX = Math.min(minX, coord[0]);
+        maxX = Math.max(maxX, coord[0]);
+        minY = Math.min(minY, coord[1]);
+        maxY = Math.max(maxY, coord[1]);
+    };
+
+    const { type, coordinates } = geom;
+    if (type === "LineString" || type === "MultiPoint") {
+        coordinates.forEach(collectCoord);
+    } else if (type === "Polygon" || type === "MultiLineString") {
+        coordinates.flat().forEach(collectCoord);
+    } else if (type === "MultiPolygon") {
+        coordinates.flat(2).forEach(collectCoord);
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+        return null;
+    }
+
+    return [(minX + maxX) / 2, (minY + maxY) / 2];
+}
+
 export function renderMapData(map, {
     points,
     candidates,
     highlightedId,
     onFeatureHover,
     onFeatureClick,
-    shouldFit = false
+    shouldFit = false,
+    flyToHighlight = false
 }) {
     const track = trackGeoJson(points);
     const footprints = candidates
@@ -247,6 +285,15 @@ export function renderMapData(map, {
 
         if (shouldFit) {
             fitToData(map, [track, ...footprints]);
+        } else if (flyToHighlight && highlightFeature) {
+            const center = centerOfGeometry(highlightFeature.geometry);
+            if (center) {
+                map.flyTo({
+                    center,
+                    duration: 700,
+                    essential: true
+                });
+            }
         }
     };
 
