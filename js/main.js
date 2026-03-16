@@ -286,6 +286,28 @@ function rerenderMap(shouldFit = false, flyToHighlight = false) {
     });
 }
 
+function clearCurrentSearch() {
+    state.shortlist = [];
+    state.points = [];
+    state.chunks = [];
+    state.candidates = [];
+    state.shortlistedFeatures = [];
+    state.rows = [];
+    state.highlightedFeatureId = null;
+    state.collectionColors = new Map();
+
+    resultsTbody.innerHTML = "";
+    renderLegend(state.collectionColors);
+    resultCandidates.textContent = "0";
+    resultShortlist.textContent = "0";
+
+    jsonBtn.disabled = true;
+    csvBtn.disabled = true;
+
+    rerenderMap(false, false);
+    refreshMetrics();
+}
+
 function renderResultsTable(rows) {
     resultsTbody.innerHTML = "";
 
@@ -507,6 +529,7 @@ csvBtn.addEventListener("click", () => {
 });
 
 newSearchBtn.addEventListener("click", () => {
+    clearCurrentSearch();
     showSearchView();
     setStatus("Idle");
     setProgress("Ready. Load AIS CSV to begin.");
