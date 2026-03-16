@@ -29,21 +29,6 @@
         </label>
 
         <label>
-          Longitude column
-          <input id="lonColumn" type="text" value="Lng" required />
-        </label>
-
-        <label>
-          Latitude column
-          <input id="latColumn" type="text" value="Lat" required />
-        </label>
-
-        <label>
-          Time column
-          <input id="timeColumn" type="text" value="Date/Time" required />
-        </label>
-
-        <label>
           Collections (comma-separated)
           <input id="collections" type="text" value="sentinel-2-l2a" required />
         </label>
@@ -53,40 +38,60 @@
           <input id="stacUrl" type="url" value="https://catalogue.dataspace.copernicus.eu/stac/search" required />
         </label>
 
-        <label>
-          Temporal buffer (minutes)
-          <input id="temporalBufferMinutes" type="number" value="30" min="0" step="1" required />
-        </label>
+        <details class="advanced-options span-2">
+          <summary>Advanced search options</summary>
+          <div class="advanced-grid">
+            <label>
+              Longitude column
+              <input id="lonColumn" type="text" value="Lng" required />
+            </label>
 
-        <label>
-          Spatial buffer (meters)
-          <input id="spatialBufferMeters" type="number" value="0" min="0" step="1" required />
-        </label>
+            <label>
+              Latitude column
+              <input id="latColumn" type="text" value="Lat" required />
+            </label>
 
-        <label>
-          Timeout (seconds)
-          <input id="timeoutSeconds" type="number" value="30" min="1" step="1" required />
-        </label>
+            <label>
+              Time column
+              <input id="timeColumn" type="text" value="Date/Time" required />
+            </label>
 
-        <label>
-          Chunk days
-          <input id="chunkDays" type="number" value="3" min="1" step="1" required />
-        </label>
+            <label>
+              Temporal buffer (minutes)
+              <input id="temporalBufferMinutes" type="number" value="30" min="0" step="1" required />
+            </label>
 
-        <label>
-          Max query points
-          <input id="maxQueryPoints" type="number" value="120" min="2" step="1" required />
-        </label>
+            <label>
+              Spatial buffer (meters)
+              <input id="spatialBufferMeters" type="number" value="0" min="0" step="1" required />
+            </label>
 
-        <label>
-          STAC page limit
-          <input id="stacPageLimit" type="number" value="100" min="1" step="1" required />
-        </label>
+            <label>
+              Timeout (seconds)
+              <input id="timeoutSeconds" type="number" value="30" min="1" step="1" required />
+            </label>
 
-        <label>
-          Max candidate items
-          <input id="maxItems" type="number" value="1200" min="1" step="1" required />
-        </label>
+            <label>
+              Chunk days
+              <input id="chunkDays" type="number" value="3" min="1" step="1" required />
+            </label>
+
+            <label>
+              Max query points
+              <input id="maxQueryPoints" type="number" value="120" min="2" step="1" required />
+            </label>
+
+            <label>
+              STAC page limit
+              <input id="stacPageLimit" type="number" value="100" min="1" step="1" required />
+            </label>
+
+            <label>
+              Max candidate items
+              <input id="maxItems" type="number" value="1200" min="1" step="1" required />
+            </label>
+          </div>
+        </details>
 
           <div class="actions span-2">
             <button id="runBtn" type="submit">Run Matching</button>
