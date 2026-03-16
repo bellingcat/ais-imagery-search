@@ -313,9 +313,9 @@ function readSettings() {
 
     const settings = {
         file,
-        lonColumn: document.getElementById("lonColumn").value.trim() || DEFAULTS.lonColumn,
-        latColumn: document.getElementById("latColumn").value.trim() || DEFAULTS.latColumn,
-        timeColumn: document.getElementById("timeColumn").value.trim() || DEFAULTS.timeColumn,
+        lonColumn: document.getElementById("lonColumn").value.trim(),
+        latColumn: document.getElementById("latColumn").value.trim(),
+        timeColumn: document.getElementById("timeColumn").value.trim(),
         collections,
         stacUrl: document.getElementById("stacUrl").value.trim() || DEFAULTS.stacUrl,
         temporalBufferMinutes: toFiniteNumber(
