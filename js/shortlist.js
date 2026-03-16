@@ -108,6 +108,7 @@ export async function shortlistFeatures({
             const deltaMs = Math.abs(currTsMs - targetTimeMs);
             if (!bestMatch || deltaMs < bestMatch.deltaMs) {
                 bestMatch = {
+                    index: i,
                     point: curr,
                     deltaMs
                 };
@@ -115,6 +116,9 @@ export async function shortlistFeatures({
         }
 
         if (bestMatch) {
+            const prevPoint = bestMatch.index > 0 ? points[bestMatch.index - 1] : null;
+            const nextPoint = bestMatch.index < points.length - 1 ? points[bestMatch.index + 1] : null;
+
             out.push({
                 id: feature.id,
                 collection: feature.collection || "",
@@ -123,6 +127,13 @@ export async function shortlistFeatures({
                 matched_ais_lon: bestMatch.point.lon,
                 matched_ais_lat: bestMatch.point.lat,
                 matched_ais_timestamp: toIsoZ(bestMatch.point.ts),
+                matched_target_timestamp: toIsoZ(new Date(targetTimeMs)),
+                matched_ais_prev_lon: prevPoint ? prevPoint.lon : null,
+                matched_ais_prev_lat: prevPoint ? prevPoint.lat : null,
+                matched_ais_prev_timestamp: prevPoint ? toIsoZ(prevPoint.ts) : null,
+                matched_ais_next_lon: nextPoint ? nextPoint.lon : null,
+                matched_ais_next_lat: nextPoint ? nextPoint.lat : null,
+                matched_ais_next_timestamp: nextPoint ? toIsoZ(nextPoint.ts) : null,
                 matched_time_delta_seconds: Math.round(bestMatch.deltaMs / 1000),
                 _feature: feature
             });

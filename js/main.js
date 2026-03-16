@@ -4,7 +4,7 @@ import { buildQueryTrack, chunkToLineString, splitPointsByDays } from "./track.j
 import { searchStacByChunks } from "./stacClient.js";
 import { shortlistFeatures } from "./shortlist.js";
 import { createMap, renderMapData } from "./mapView.js";
-import { downloadCsv, downloadJson } from "./exporters.js";
+import { downloadCsv, downloadJson, downloadShipPositionGeoJson } from "./exporters.js";
 import { assert, splitCsvList, toFiniteNumber } from "./utils.js";
 
 const state = {
@@ -223,7 +223,16 @@ function buildResultRows(candidates, shortlist) {
             collection: String(feature.collection || ""),
             datetime: featureDateTime(feature),
             platform: String(feature?.properties?.platform || ""),
+            matched_ais_lon: match?.matched_ais_lon,
+            matched_ais_lat: match?.matched_ais_lat,
             matched_ais_timestamp: match?.matched_ais_timestamp || "",
+            matched_target_timestamp: match?.matched_target_timestamp || "",
+            matched_ais_prev_lon: match?.matched_ais_prev_lon,
+            matched_ais_prev_lat: match?.matched_ais_prev_lat,
+            matched_ais_prev_timestamp: match?.matched_ais_prev_timestamp || "",
+            matched_ais_next_lon: match?.matched_ais_next_lon,
+            matched_ais_next_lat: match?.matched_ais_next_lat,
+            matched_ais_next_timestamp: match?.matched_ais_next_timestamp || "",
             imagery_url: pickImageryUrl(feature),
             matched: Boolean(match)
         };
@@ -280,12 +289,30 @@ function renderResultsTable(rows) {
             ? `<a href="${row.imagery_url}" target="_blank" rel="noopener noreferrer">Open</a>`
             : "-";
 
+        const hasClosestPosition = Number.isFinite(row.matched_ais_lon) && Number.isFinite(row.matched_ais_lat);
+        const shipPositionCell = `<button type="button" class="ship-pos-btn" ${hasClosestPosition ? "" : "disabled"}>Download</button>`;
+
         tr.innerHTML = `
             <td>${formattedDatetime || ""}</td>
             <td>${row.platform || ""}</td>
             <td>${formattedMatchedTime || "-"}</td>
+            <td>${shipPositionCell}</td>
             <td>${imageryCell}</td>
         `;
+
+        const shipPositionBtn = tr.querySelector(".ship-pos-btn");
+        if (shipPositionBtn) {
+            shipPositionBtn.addEventListener("click", (event) => {
+                event.stopPropagation();
+                try {
+                    downloadShipPositionGeoJson(row);
+                } catch (error) {
+                    setStatus("Failed");
+                    setProgress(error.message || String(error));
+                    console.error(error);
+                }
+            });
+        }
 
         tr.addEventListener("mouseenter", () => {
             state.highlightedFeatureId = row.id;
