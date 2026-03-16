@@ -144,6 +144,27 @@ function featureDateTime(feature) {
     return props.datetime || props.start_datetime || "";
 }
 
+function formatDisplayTimestamp(value) {
+    const text = String(value || "").trim();
+    if (!text) {
+        return "";
+    }
+
+    const withSpace = text.replace("T", " ");
+    const noMillis = withSpace.replace(/(\d{2}:\d{2}:\d{2})\.\d+/, "$1");
+    const noMillisNoZulu = noMillis.replace(/Z$/, "");
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(noMillisNoZulu)) {
+        return noMillisNoZulu;
+    }
+
+    const parsed = new Date(text);
+    if (Number.isFinite(parsed.getTime())) {
+        return parsed.toISOString().slice(0, 19).replace("T", " ").replace(/Z$/, "");
+    }
+
+    return noMillisNoZulu;
+}
+
 function toBrowserItemUrl(selfHref) {
     if (!selfHref) {
         return "";
@@ -252,16 +273,17 @@ function renderResultsTable(rows) {
         const tr = document.createElement("tr");
         tr.setAttribute("data-feature-id", row.id);
 
+        const formattedDatetime = formatDisplayTimestamp(row.datetime);
+        const formattedMatchedTime = formatDisplayTimestamp(row.matched_ais_timestamp);
+
         const imageryCell = row.imagery_url
             ? `<a href="${row.imagery_url}" target="_blank" rel="noopener noreferrer">Open</a>`
             : "-";
 
         tr.innerHTML = `
-            <td>${row.id || ""}</td>
-            <td>${row.collection || ""}</td>
-            <td>${row.datetime || ""}</td>
+            <td>${formattedDatetime || ""}</td>
             <td>${row.platform || ""}</td>
-            <td>${row.matched_ais_timestamp || "-"}</td>
+            <td>${formattedMatchedTime || "-"}</td>
             <td>${imageryCell}</td>
         `;
 
