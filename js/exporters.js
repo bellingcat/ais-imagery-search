@@ -19,7 +19,8 @@ export function shortlistToCsv(shortlist) {
         "platform",
         "matched_ais_lon",
         "matched_ais_lat",
-        "matched_ais_timestamp"
+        "matched_ais_timestamp",
+        "matched_time_delta_seconds"
     ];
 
     const header = columns.join(",");

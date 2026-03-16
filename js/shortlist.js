@@ -24,6 +24,10 @@ function featureWindow(feature) {
     return null;
 }
 
+function featureTargetTimeMs(startMs, endMs) {
+    return Math.round((startMs + endMs) / 2);
+}
+
 function metersToDegreesLat(meters) {
     return meters / 111320;
 }
@@ -69,14 +73,17 @@ export async function shortlistFeatures({
         }
 
         const [fStart, fEnd] = fWindow;
+        const targetTimeMs = featureTargetTimeMs(fStart, fEnd);
+        let bestMatch = null;
 
         for (let i = 0; i < points.length; i += 1) {
             const prev = i > 0 ? points[i - 1] : null;
             const curr = points[i];
             const next = i < points.length - 1 ? points[i + 1] : null;
+            const currTsMs = curr.ts.getTime();
 
-            let pStart = curr.ts.getTime() - temporalBufferMs;
-            let pEnd = curr.ts.getTime() + temporalBufferMs;
+            let pStart = currTsMs - temporalBufferMs;
+            let pEnd = currTsMs + temporalBufferMs;
 
             if (prev) {
                 pStart = Math.max(pStart, prev.ts.getTime());
@@ -98,18 +105,27 @@ export async function shortlistFeatures({
                 continue;
             }
 
+            const deltaMs = Math.abs(currTsMs - targetTimeMs);
+            if (!bestMatch || deltaMs < bestMatch.deltaMs) {
+                bestMatch = {
+                    point: curr,
+                    deltaMs
+                };
+            }
+        }
+
+        if (bestMatch) {
             out.push({
                 id: feature.id,
                 collection: feature.collection || "",
                 datetime: feature?.properties?.datetime || feature?.properties?.start_datetime || "",
                 platform: feature?.properties?.platform || "",
-                matched_ais_lon: curr.lon,
-                matched_ais_lat: curr.lat,
-                matched_ais_timestamp: toIsoZ(curr.ts),
+                matched_ais_lon: bestMatch.point.lon,
+                matched_ais_lat: bestMatch.point.lat,
+                matched_ais_timestamp: toIsoZ(bestMatch.point.ts),
+                matched_time_delta_seconds: Math.round(bestMatch.deltaMs / 1000),
                 _feature: feature
             });
-
-            break;
         }
 
         if (typeof onProgress === "function") {
