@@ -215,7 +215,7 @@ function renderLegend(colorMap) {
 function buildResultRows(candidates, shortlist) {
     const shortlistById = new Map(shortlist.map((row) => [String(row.id), row]));
 
-    return candidates.map((feature) => {
+    const rows = candidates.map((feature) => {
         const featureId = String(feature.id ?? "");
         const match = shortlistById.get(featureId);
         return {
@@ -237,6 +237,16 @@ function buildResultRows(candidates, shortlist) {
             matched: Boolean(match)
         };
     });
+
+    rows.sort((a, b) => {
+        const aMs = new Date(a.datetime || "").getTime();
+        const bMs = new Date(b.datetime || "").getTime();
+        const safeA = Number.isFinite(aMs) ? aMs : Number.NEGATIVE_INFINITY;
+        const safeB = Number.isFinite(bMs) ? bMs : Number.NEGATIVE_INFINITY;
+        return safeB - safeA;
+    });
+
+    return rows;
 }
 
 function setHighlightedRow(featureId, shouldScroll) {
@@ -285,16 +295,14 @@ function renderResultsTable(rows) {
         const formattedDatetime = formatDisplayTimestamp(row.datetime);
         const formattedMatchedTime = formatDisplayTimestamp(row.matched_ais_timestamp);
 
-        const imageryCell = row.imagery_url
-            ? `<a href="${row.imagery_url}" target="_blank" rel="noopener noreferrer">Open</a>`
-            : "-";
-
         const hasClosestPosition = Number.isFinite(row.matched_ais_lon) && Number.isFinite(row.matched_ais_lat);
         const shipPositionCell = `<button type="button" class="ship-pos-btn" ${hasClosestPosition ? "" : "disabled"}>Download</button>`;
+        const hasImageryUrl = Boolean(row.imagery_url);
+        const imageryCell = `<button type="button" class="imagery-btn" ${hasImageryUrl ? "" : "disabled"}>Open</button>`;
 
         tr.innerHTML = `
-            <td>${formattedDatetime || ""}</td>
             <td>${row.platform || ""}</td>
+            <td>${formattedDatetime || ""}</td>
             <td>${formattedMatchedTime || "-"}</td>
             <td>${shipPositionCell}</td>
             <td>${imageryCell}</td>
@@ -311,6 +319,18 @@ function renderResultsTable(rows) {
                     setProgress(error.message || String(error));
                     console.error(error);
                 }
+            });
+        }
+
+        const imageryBtn = tr.querySelector(".imagery-btn");
+        if (imageryBtn) {
+            imageryBtn.addEventListener("click", (event) => {
+                event.stopPropagation();
+                if (!row.imagery_url) {
+                    return;
+                }
+
+                window.open(row.imagery_url, "_blank", "noopener,noreferrer");
             });
         }
 
@@ -357,7 +377,19 @@ function readSettings() {
     const file = document.getElementById("csvFile").files?.[0];
     assert(file, "Please select a CSV file.");
 
-    const collections = splitCsvList(document.getElementById("collections").value);
+    const selectedCollections = [];
+    if (document.getElementById("collectionS1")?.checked) {
+        selectedCollections.push("sentinel-1-grd");
+    }
+    if (document.getElementById("collectionS2")?.checked) {
+        selectedCollections.push("sentinel-2-l2a");
+    }
+    if (document.getElementById("collectionLandsat")?.checked) {
+        selectedCollections.push("landsat-c2-l1-oli-tirs");
+    }
+
+    const additionalCollections = splitCsvList(document.getElementById("additionalCollections")?.value || "");
+    const collections = Array.from(new Set([...selectedCollections, ...additionalCollections]));
     assert(collections.length > 0, "At least one collection is required.");
 
     const settings = {

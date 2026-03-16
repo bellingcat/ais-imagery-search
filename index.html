@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AIS-STAC Matcher</title>
+  <title>AIS Satellite Imagery Search</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -18,29 +18,45 @@
     <section class="panel controls-panel">
       <section id="searchView">
         <header>
-          <h1>AIS to STAC Strict Matcher</h1>
-          <p>Upload AIS CSV, query STAC by track chunks, then shortlist by temporal and spatial first-match checks.</p>
+          <h1>AIS Satellite Imagery Search</h1>
+          <p>Search Sentinel and Landsat imagery using ship tracking data.</p>
         </header>
 
         <form id="controlsForm" class="controls-grid">
-        <label>
+        <label class="span-2">
           AIS CSV
           <input id="csvFile" type="file" accept=".csv,text/csv" required />
         </label>
 
-        <label>
-          Collections (comma-separated)
-          <input id="collections" type="text" value="sentinel-2-l2a" required />
-        </label>
-
-        <label class="span-2">
-          STAC search URL
-          <input id="stacUrl" type="url" value="https://catalogue.dataspace.copernicus.eu/stac/search" required />
-        </label>
+        <fieldset class="collection-fieldset span-2">
+          <legend>Collections</legend>
+          <label class="checkbox-label">
+            <input id="collectionS1" type="checkbox" value="sentinel-1-grd" />
+            Sentinel 1 (SAR)
+          </label>
+          <label class="checkbox-label">
+            <input id="collectionS2" type="checkbox" value="sentinel-2-l2a" checked />
+            Sentinel 2 (optical)
+          </label>
+          <label class="checkbox-label">
+            <input id="collectionLandsat" type="checkbox" value="landsat-c2-l1-oli-tirs" checked />
+            Landsat (optical)
+          </label>
+        </fieldset>
 
         <details class="advanced-options span-2">
           <summary>Advanced search options</summary>
           <div class="advanced-grid">
+            <label class="span-2">
+              STAC search URL
+              <input id="stacUrl" type="url" value="https://catalogue.dataspace.copernicus.eu/stac/search" required />
+            </label>
+
+            <label class="span-2">
+              Additional collections (comma-separated)
+              <input id="additionalCollections" type="text" value="" placeholder="Example: ccm-optical, ccm-sar" />
+            </label>
+
             <label>
               Longitude column
               <input id="lonColumn" type="text" value="" placeholder="Auto-detect if blank" />
@@ -73,7 +89,7 @@
 
             <label>
               Chunk days
-              <input id="chunkDays" type="number" value="3" min="1" step="1" required />
+              <input id="chunkDays" type="number" value="6" min="1" step="1" required />
             </label>
 
             <label>
@@ -140,10 +156,10 @@
           <table class="results-table" id="resultsTable">
             <thead>
               <tr>
-                <th>Datetime</th>
                 <th>Platform</th>
+                <th>Imaging Time</th>
                 <th>Matched AIS Time</th>
-                <th>Ship Position</th>
+                <th>AIS Position</th>
                 <th>Imagery</th>
               </tr>
             </thead>

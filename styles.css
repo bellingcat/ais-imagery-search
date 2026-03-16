@@ -132,6 +132,10 @@ body.resizing * {
   gap: 12px;
 }
 
+.controls-grid > * {
+  min-width: 0;
+}
+
 .advanced-options {
   border: 1px solid rgba(18, 38, 32, 0.14);
   border-radius: 10px;
@@ -175,9 +179,37 @@ label {
   gap: 6px;
   font-size: 0.9rem;
   color: var(--muted);
+  min-width: 0;
 }
 
-input {
+.collection-fieldset {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(18, 38, 32, 0.18);
+  border-radius: 10px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.collection-fieldset legend {
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.checkbox-label {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+
+input:not([type="checkbox"]) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   font: inherit;
   padding: 10px 11px;
   border-radius: 10px;
@@ -185,7 +217,11 @@ input {
   background: rgba(255, 255, 255, 0.9);
 }
 
-input:focus {
+input[type="file"] {
+  overflow: hidden;
+}
+
+input:not([type="checkbox"]):focus {
   outline: 2px solid rgba(200, 76, 9, 0.25);
   border-color: var(--accent);
 }
@@ -194,6 +230,7 @@ input:focus {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  margin-top: 16px;
 }
 
 button {
