@@ -24,6 +24,10 @@ function featureWindow(feature) {
     return null;
 }
 
+function featureTargetTimeMs(startMs, endMs) {
+    return Math.round((startMs + endMs) / 2);
+}
+
 function metersToDegreesLat(meters) {
     return meters / 111320;
 }
@@ -69,14 +73,17 @@ export async function shortlistFeatures({
         }
 
         const [fStart, fEnd] = fWindow;
+        const targetTimeMs = featureTargetTimeMs(fStart, fEnd);
+        let bestMatch = null;
 
         for (let i = 0; i < points.length; i += 1) {
             const prev = i > 0 ? points[i - 1] : null;
             const curr = points[i];
             const next = i < points.length - 1 ? points[i + 1] : null;
+            const currTsMs = curr.ts.getTime();
 
-            let pStart = curr.ts.getTime() - temporalBufferMs;
-            let pEnd = curr.ts.getTime() + temporalBufferMs;
+            let pStart = currTsMs - temporalBufferMs;
+            let pEnd = currTsMs + temporalBufferMs;
 
             if (prev) {
                 pStart = Math.max(pStart, prev.ts.getTime());
@@ -98,18 +105,38 @@ export async function shortlistFeatures({
                 continue;
             }
 
+            const deltaMs = Math.abs(currTsMs - targetTimeMs);
+            if (!bestMatch || deltaMs < bestMatch.deltaMs) {
+                bestMatch = {
+                    index: i,
+                    point: curr,
+                    deltaMs
+                };
+            }
+        }
+
+        if (bestMatch) {
+            const prevPoint = bestMatch.index > 0 ? points[bestMatch.index - 1] : null;
+            const nextPoint = bestMatch.index < points.length - 1 ? points[bestMatch.index + 1] : null;
+
             out.push({
                 id: feature.id,
                 collection: feature.collection || "",
                 datetime: feature?.properties?.datetime || feature?.properties?.start_datetime || "",
                 platform: feature?.properties?.platform || "",
-                matched_ais_lon: curr.lon,
-                matched_ais_lat: curr.lat,
-                matched_ais_timestamp: toIsoZ(curr.ts),
+                matched_ais_lon: bestMatch.point.lon,
+                matched_ais_lat: bestMatch.point.lat,
+                matched_ais_timestamp: toIsoZ(bestMatch.point.ts),
+                matched_target_timestamp: toIsoZ(new Date(targetTimeMs)),
+                matched_ais_prev_lon: prevPoint ? prevPoint.lon : null,
+                matched_ais_prev_lat: prevPoint ? prevPoint.lat : null,
+                matched_ais_prev_timestamp: prevPoint ? toIsoZ(prevPoint.ts) : null,
+                matched_ais_next_lon: nextPoint ? nextPoint.lon : null,
+                matched_ais_next_lat: nextPoint ? nextPoint.lat : null,
+                matched_ais_next_timestamp: nextPoint ? toIsoZ(nextPoint.ts) : null,
+                matched_time_delta_seconds: Math.round(bestMatch.deltaMs / 1000),
                 _feature: feature
             });
-
-            break;
         }
 
         if (typeof onProgress === "function") {

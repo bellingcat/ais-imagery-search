@@ -33,6 +33,7 @@ npx serve .
 ## Dependencies (CDN)
 
 - maplibre-gl 4.7.1
+- pmtiles 3.2.1
 - papaparse 5.4.1
 - @turf/helpers 7.2.0
 - @turf/boolean-intersects 7.2.0

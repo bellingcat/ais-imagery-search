@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AIS-STAC Matcher</title>
+  <title>AIS Satellite Imagery Search</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
@@ -16,100 +16,166 @@
 
   <main class="app-shell">
     <section class="panel controls-panel">
-      <header>
-        <h1>AIS to STAC Strict Matcher</h1>
-        <p>Upload AIS CSV, query STAC by track chunks, then shortlist by temporal and spatial first-match checks.</p>
-      </header>
+      <section id="searchView">
+        <header>
+          <h1>AIS Satellite Imagery Search</h1>
+          <p>Search Sentinel and Landsat imagery using ship tracking data.</p>
+        </header>
 
-      <form id="controlsForm" class="controls-grid">
-        <label>
+        <form id="controlsForm" class="controls-grid">
+        <label class="span-2">
           AIS CSV
           <input id="csvFile" type="file" accept=".csv,text/csv" required />
         </label>
 
-        <label>
-          Longitude column
-          <input id="lonColumn" type="text" value="lon" required />
-        </label>
+        <fieldset class="collection-fieldset span-2">
+          <legend>Collections</legend>
+          <label class="checkbox-label">
+            <input id="collectionS1" type="checkbox" value="sentinel-1-grd" />
+            Sentinel 1 (SAR)
+          </label>
+          <label class="checkbox-label">
+            <input id="collectionS2" type="checkbox" value="sentinel-2-l2a" checked />
+            Sentinel 2 (optical)
+          </label>
+          <label class="checkbox-label">
+            <input id="collectionLandsat" type="checkbox" value="landsat-c2-l1-oli-tirs" checked />
+            Landsat (optical)
+          </label>
+        </fieldset>
 
-        <label>
-          Latitude column
-          <input id="latColumn" type="text" value="lat" required />
-        </label>
+        <details class="advanced-options span-2">
+          <summary>Advanced search options</summary>
+          <div class="advanced-grid">
+            <label class="span-2">
+              STAC search URL
+              <input id="stacUrl" type="url" value="https://catalogue.dataspace.copernicus.eu/stac/search" required />
+            </label>
 
-        <label>
-          Time column
-          <input id="timeColumn" type="text" value="timestamp" required />
-        </label>
+            <label class="span-2">
+              Additional collections (comma-separated)
+              <input id="additionalCollections" type="text" value="" placeholder="Example: ccm-optical, ccm-sar" />
+            </label>
 
-        <label>
-          Collections (comma-separated)
-          <input id="collections" type="text" value="sentinel-1-grd" required />
-        </label>
+            <label>
+              Longitude column
+              <input id="lonColumn" type="text" value="" placeholder="Auto-detect if blank" />
+            </label>
 
-        <label class="span-2">
-          STAC search URL
-          <input id="stacUrl" type="url" value="https://catalogue.dataspace.copernicus.eu/stac/search" required />
-        </label>
+            <label>
+              Latitude column
+              <input id="latColumn" type="text" value="" placeholder="Auto-detect if blank" />
+            </label>
 
-        <label>
-          Temporal buffer (minutes)
-          <input id="temporalBufferMinutes" type="number" value="30" min="0" step="1" required />
-        </label>
+            <label>
+              Time column
+              <input id="timeColumn" type="text" value="" placeholder="Auto-detect if blank" />
+            </label>
 
-        <label>
-          Spatial buffer (meters)
-          <input id="spatialBufferMeters" type="number" value="0" min="0" step="1" required />
-        </label>
+            <label>
+              Temporal buffer (minutes)
+              <input id="temporalBufferMinutes" type="number" value="30" min="0" step="1" required />
+            </label>
 
-        <label>
-          Timeout (seconds)
-          <input id="timeoutSeconds" type="number" value="30" min="1" step="1" required />
-        </label>
+            <label>
+              Spatial buffer (meters)
+              <input id="spatialBufferMeters" type="number" value="0" min="0" step="1" required />
+            </label>
 
-        <label>
-          Chunk days
-          <input id="chunkDays" type="number" value="3" min="1" step="1" required />
-        </label>
+            <label>
+              Timeout (seconds)
+              <input id="timeoutSeconds" type="number" value="30" min="1" step="1" required />
+            </label>
 
-        <label>
-          Max query points
-          <input id="maxQueryPoints" type="number" value="120" min="2" step="1" required />
-        </label>
+            <label>
+              Chunk days
+              <input id="chunkDays" type="number" value="6" min="1" step="1" required />
+            </label>
 
-        <label>
-          STAC page limit
-          <input id="stacPageLimit" type="number" value="100" min="1" step="1" required />
-        </label>
+            <label>
+              Max query points
+              <input id="maxQueryPoints" type="number" value="120" min="2" step="1" required />
+            </label>
 
-        <label>
-          Max candidate items
-          <input id="maxItems" type="number" value="1200" min="1" step="1" required />
-        </label>
+            <label>
+              STAC page limit
+              <input id="stacPageLimit" type="number" value="100" min="1" step="1" required />
+            </label>
 
-        <div class="actions span-2">
-          <button id="runBtn" type="submit">Run Matching</button>
+            <label>
+              Max candidate items
+              <input id="maxItems" type="number" value="1200" min="1" step="1" required />
+            </label>
+          </div>
+        </details>
+
+          <div class="actions span-2">
+            <button id="runBtn" type="submit">Run Matching</button>
+          </div>
+        </form>
+
+        <section class="status" aria-live="polite">
+          <h2>Status</h2>
+          <p id="statusLine">Idle</p>
+          <p id="progressLine">No active run.</p>
+        </section>
+
+        <section class="metrics">
+          <h2>Metrics</h2>
+          <ul>
+            <li>AIS points: <strong id="metricPoints">0</strong></li>
+            <li>Chunks: <strong id="metricChunks">0</strong></li>
+            <li>Unique candidates: <strong id="metricCandidates">0</strong></li>
+            <li>Shortlist count: <strong id="metricShortlist">0</strong></li>
+          </ul>
+        </section>
+      </section>
+
+      <section id="resultsView" class="hidden">
+        <header class="results-header">
+          <h1>Results</h1>
+          <p>Hover or click a footprint on the map to jump to its row in the table.</p>
+        </header>
+
+        <div class="actions">
+          <button id="newSearchBtn" type="button">New Search</button>
           <button id="jsonBtn" type="button" disabled>Download JSON</button>
           <button id="csvBtn" type="button" disabled>Download CSV</button>
         </div>
-      </form>
 
-      <section class="status" aria-live="polite">
-        <h2>Status</h2>
-        <p id="statusLine">Idle</p>
-        <p id="progressLine">No active run.</p>
-      </section>
+        <section class="metrics">
+          <h2>Results Metrics</h2>
+          <ul>
+            <li>Candidate features: <strong id="resultCandidates">0</strong></li>
+            <li>Matched shortlist: <strong id="resultShortlist">0</strong></li>
+          </ul>
+          <div id="resultsLegend" class="legend"></div>
+        </section>
 
-      <section class="metrics">
-        <h2>Metrics</h2>
-        <ul>
-          <li>AIS points: <strong id="metricPoints">0</strong></li>
-          <li>Chunks: <strong id="metricChunks">0</strong></li>
-          <li>Unique candidates: <strong id="metricCandidates">0</strong></li>
-          <li>Shortlist count: <strong id="metricShortlist">0</strong></li>
-        </ul>
+        <section class="results-table-wrap" aria-label="Results table">
+          <table class="results-table" id="resultsTable">
+            <thead>
+              <tr>
+                <th>Platform</th>
+                <th>Imaging Time</th>
+                <th>Matched AIS Time</th>
+                <th>AIS Position</th>
+                <th>Imagery</th>
+              </tr>
+            </thead>
+            <tbody id="resultsTbody"></tbody>
+          </table>
+        </section>
       </section>
     </section>
+
+    <div
+      id="paneResizer"
+      class="pane-resizer"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize left panel"
+    ></div>
 
     <section class="panel map-panel">
       <div id="map" role="img" aria-label="AIS track and matched feature footprints"></div>

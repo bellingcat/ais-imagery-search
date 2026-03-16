@@ -1,12 +1,31 @@
 import maplibregl from "https://esm.sh/maplibre-gl@4.7.1";
+import { Protocol } from "https://esm.sh/pmtiles@3.2.1";
 import { MAP_STYLE } from "./config.js";
 
 const TRACK_SOURCE_ID = "ais-track-source";
 const TRACK_LAYER_ID = "ais-track-layer";
-const FOOTPRINT_SOURCE_ID = "stac-footprints-source";
-const FOOTPRINT_LAYER_ID = "stac-footprints-layer";
+const CANDIDATE_SOURCE_ID = "stac-candidates-source";
+const CANDIDATE_FILL_LAYER_ID = "stac-candidates-fill-layer";
+const CANDIDATE_LINE_LAYER_ID = "stac-candidates-line-layer";
+const HIGHLIGHT_SOURCE_ID = "stac-highlight-source";
+const HIGHLIGHT_LAYER_ID = "stac-highlight-layer";
+
+const interactionStateByMap = new WeakMap();
+let pmtilesProtocolRegistered = false;
+
+function ensurePmtilesProtocol() {
+    if (pmtilesProtocolRegistered) {
+        return;
+    }
+
+    const protocol = new Protocol();
+    maplibregl.addProtocol("pmtiles", protocol.tile);
+    pmtilesProtocolRegistered = true;
+}
 
 export function createMap(containerId) {
+    ensurePmtilesProtocol();
+
     const map = new maplibregl.Map({
         container: containerId,
         style: MAP_STYLE,
@@ -34,6 +53,63 @@ function featureCollection(features) {
         type: "FeatureCollection",
         features
     };
+}
+
+function emptyFeatureCollection() {
+    return { type: "FeatureCollection", features: [] };
+}
+
+function selectHighlightFeature(footprints, featureId) {
+    if (!featureId) {
+        return null;
+    }
+
+    return footprints.find((f) => String(f.properties?.id) === String(featureId)) || null;
+}
+
+function ensureInteractionHandlers(map, onHover, onClick) {
+    const previous = interactionStateByMap.get(map);
+    if (previous) {
+        map.off("mousemove", CANDIDATE_FILL_LAYER_ID, previous.onMove);
+        map.off("mousemove", CANDIDATE_LINE_LAYER_ID, previous.onMove);
+        map.off("click", CANDIDATE_FILL_LAYER_ID, previous.onClick);
+        map.off("click", CANDIDATE_LINE_LAYER_ID, previous.onClick);
+        map.off("mouseleave", CANDIDATE_FILL_LAYER_ID, previous.onLeave);
+        map.off("mouseleave", CANDIDATE_LINE_LAYER_ID, previous.onLeave);
+    }
+
+    const onMove = (event) => {
+        const featureId = event.features?.[0]?.properties?.id;
+        if (featureId && typeof onHover === "function") {
+            onHover(String(featureId));
+        }
+    };
+
+    const onClickLayer = (event) => {
+        const featureId = event.features?.[0]?.properties?.id;
+        if (featureId && typeof onClick === "function") {
+            onClick(String(featureId));
+        }
+    };
+
+    const onLeave = () => {
+        if (typeof onHover === "function") {
+            onHover(null);
+        }
+    };
+
+    map.on("mousemove", CANDIDATE_FILL_LAYER_ID, onMove);
+    map.on("mousemove", CANDIDATE_LINE_LAYER_ID, onMove);
+    map.on("click", CANDIDATE_FILL_LAYER_ID, onClickLayer);
+    map.on("click", CANDIDATE_LINE_LAYER_ID, onClickLayer);
+    map.on("mouseleave", CANDIDATE_FILL_LAYER_ID, onLeave);
+    map.on("mouseleave", CANDIDATE_LINE_LAYER_ID, onLeave);
+
+    interactionStateByMap.set(map, {
+        onMove,
+        onClick: onClickLayer,
+        onLeave
+    });
 }
 
 function fitToData(map, features) {
@@ -79,12 +155,66 @@ function fitToData(map, features) {
     map.fitBounds([[minX, minY], [maxX, maxY]], { padding: 40, duration: 600 });
 }
 
-export function renderMapData(map, points, shortlist) {
+function centerOfGeometry(geom) {
+    if (!geom) {
+        return null;
+    }
+
+    if (geom.type === "Point" && Array.isArray(geom.coordinates) && geom.coordinates.length >= 2) {
+        return [geom.coordinates[0], geom.coordinates[1]];
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    const collectCoord = (coord) => {
+        minX = Math.min(minX, coord[0]);
+        maxX = Math.max(maxX, coord[0]);
+        minY = Math.min(minY, coord[1]);
+        maxY = Math.max(maxY, coord[1]);
+    };
+
+    const { type, coordinates } = geom;
+    if (type === "LineString" || type === "MultiPoint") {
+        coordinates.forEach(collectCoord);
+    } else if (type === "Polygon" || type === "MultiLineString") {
+        coordinates.flat().forEach(collectCoord);
+    } else if (type === "MultiPolygon") {
+        coordinates.flat(2).forEach(collectCoord);
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+        return null;
+    }
+
+    return [(minX + maxX) / 2, (minY + maxY) / 2];
+}
+
+export function renderMapData(map, {
+    points,
+    candidates,
+    highlightedId,
+    onFeatureHover,
+    onFeatureClick,
+    shouldFit = false,
+    flyToHighlight = false
+}) {
     const track = trackGeoJson(points);
-    const footprints = shortlist
-        .map((s) => s._feature)
+    const footprints = candidates
         .filter((f) => f?.geometry)
-        .map((f) => ({ type: "Feature", geometry: f.geometry, properties: { id: f.id } }));
+        .map((f) => ({
+            type: "Feature",
+            geometry: f.geometry,
+            properties: {
+                id: String(f.id ?? ""),
+                collection: String(f.collection || "unknown"),
+                collection_color: String(f._collectionColor || "#f88906")
+            }
+        }));
+
+    const highlightFeature = selectHighlightFeature(footprints, highlightedId);
 
     const draw = () => {
         const trackSource = map.getSource(TRACK_SOURCE_ID);
@@ -97,31 +227,74 @@ export function renderMapData(map, points, shortlist) {
                 type: "line",
                 source: TRACK_SOURCE_ID,
                 paint: {
-                    "line-color": "#c84c09",
+                    "line-color": "#fbb400",
                     "line-width": 3
                 }
             });
         }
 
         const fpCollection = featureCollection(footprints);
-        const fpSource = map.getSource(FOOTPRINT_SOURCE_ID);
+        const fpSource = map.getSource(CANDIDATE_SOURCE_ID);
         if (fpSource) {
             fpSource.setData(fpCollection);
         } else {
-            map.addSource(FOOTPRINT_SOURCE_ID, { type: "geojson", data: fpCollection });
+            map.addSource(CANDIDATE_SOURCE_ID, { type: "geojson", data: fpCollection });
             map.addLayer({
-                id: FOOTPRINT_LAYER_ID,
+                id: CANDIDATE_FILL_LAYER_ID,
                 type: "fill",
-                source: FOOTPRINT_SOURCE_ID,
+                source: CANDIDATE_SOURCE_ID,
                 paint: {
-                    "fill-color": "#2f6f5e",
-                    "fill-opacity": 0.25,
-                    "fill-outline-color": "#204b3f"
+                    "fill-color": ["get", "collection_color"],
+                    "fill-opacity": 0.33,
+                    "fill-outline-color": "#18342d"
+                }
+            });
+
+            map.addLayer({
+                id: CANDIDATE_LINE_LAYER_ID,
+                type: "line",
+                source: CANDIDATE_SOURCE_ID,
+                paint: {
+                    "line-color": ["get", "collection_color"],
+                    "line-width": 1.2,
+                    "line-opacity": 0.8
+                }
+            });
+
+            ensureInteractionHandlers(map, onFeatureHover, onFeatureClick);
+        }
+
+        const highlightCollection = highlightFeature
+            ? featureCollection([highlightFeature])
+            : emptyFeatureCollection();
+        const highlightSource = map.getSource(HIGHLIGHT_SOURCE_ID);
+        if (highlightSource) {
+            highlightSource.setData(highlightCollection);
+        } else {
+            map.addSource(HIGHLIGHT_SOURCE_ID, { type: "geojson", data: highlightCollection });
+            map.addLayer({
+                id: HIGHLIGHT_LAYER_ID,
+                type: "line",
+                source: HIGHLIGHT_SOURCE_ID,
+                paint: {
+                    "line-color": "#fbb400",
+                    "line-width": 3
                 }
             });
         }
 
-        fitToData(map, [track, ...footprints]);
+        if (shouldFit) {
+            fitToData(map, [track, ...footprints]);
+        } else if (flyToHighlight && highlightFeature) {
+            const center = centerOfGeometry(highlightFeature.geometry);
+            if (center) {
+                map.flyTo({
+                    center,
+                    duration: 700,
+                    essential: true
+                });
+            }
+        }
     };
 
     if (map.isStyleLoaded()) {

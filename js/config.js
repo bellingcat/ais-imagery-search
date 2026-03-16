@@ -1,9 +1,9 @@
 export const DEFAULTS = {
     stacUrl: "https://catalogue.dataspace.copernicus.eu/stac/search",
     collections: ["sentinel-2-l2a"],
-    lonColumn: "lon",
-    latColumn: "lat",
-    timeColumn: "timestamp",
+    lonColumn: "Lng",
+    latColumn: "Lat",
+    timeColumn: "Date/Time",
     temporalBufferMinutes: 30,
     spatialBufferMeters: 0,
     timeoutSeconds: 30,

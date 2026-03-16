@@ -1,6 +1,11 @@
 import { toIsoZ } from "./time.js";
 import { yieldToUI } from "./utils.js";
 
+const MAX_429_RETRIES = 4;
+const DEFAULT_429_WAIT_MS = 2000;
+const MAX_RETRY_AFTER_MS = 120000;
+const DEFAULT_REQUEST_DELAY_MS = 200;
+
 function buildHeaders() {
     return {
         Accept: "application/geo+json, application/json",
@@ -8,46 +13,119 @@ function buildHeaders() {
     };
 }
 
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseRetryAfterMs(retryAfterValue) {
+    if (!retryAfterValue) {
+        return null;
+    }
+
+    const seconds = Number(retryAfterValue);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+        return seconds * 1000;
+    }
+
+    const retryDate = Date.parse(retryAfterValue);
+    if (Number.isFinite(retryDate)) {
+        return Math.max(0, retryDate - Date.now());
+    }
+
+    return null;
+}
+
+function isRetriableNetworkError(error) {
+    if (!error) {
+        return false;
+    }
+
+    if (error.name === "TypeError") {
+        return true;
+    }
+
+    const message = String(error.message || "").toLowerCase();
+    return message.includes("networkerror") || message.includes("failed to fetch");
+}
+
 async function fetchJsonWithTimeout(url, init, timeoutMs) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-        const response = await fetch(url, {
-            ...init,
-            signal: controller.signal,
-            headers: {
-                ...buildHeaders(),
-                ...(init.headers || {})
-            }
-        });
-
-        if (!response.ok) {
-            const bodyText = await response.text().catch(() => "<no body>");
-            throw new Error(
-                `HTTP ${response.status} ${response.statusText} from ${url}. Body: ${bodyText.slice(0, 500)}`
-            );
-        }
-
-        const contentType = (response.headers.get("content-type") || "").toLowerCase();
-        if (!contentType.includes("json")) {
-            throw new Error(`Expected JSON response from ${url}, got content-type: ${contentType || "unknown"}`);
-        }
+    for (let attempt = 1; attempt <= MAX_429_RETRIES + 1; attempt += 1) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         try {
-            return await response.json();
-        } catch (error) {
-            throw new Error(`Failed parsing JSON from ${url}: ${error.message}`);
-        }
-    } catch (error) {
-        if (error.name === "AbortError") {
-            throw new Error(`Request timed out after ${timeoutMs} ms for ${url}`);
-        }
+            const response = await fetch(url, {
+                ...init,
+                signal: controller.signal,
+                headers: {
+                    ...buildHeaders(),
+                    ...(init.headers || {})
+                }
+            });
 
-        throw error;
-    } finally {
-        clearTimeout(timeoutId);
+            if (response.status === 429) {
+                const retryAfterRaw = response.headers.get("retry-after");
+                const retryAfterMs = parseRetryAfterMs(retryAfterRaw);
+                const fallbackBackoffMs = DEFAULT_429_WAIT_MS * attempt;
+                const waitMs = Math.min(
+                    MAX_RETRY_AFTER_MS,
+                    retryAfterMs == null ? fallbackBackoffMs : retryAfterMs
+                );
+
+                if (attempt <= MAX_429_RETRIES) {
+                    await sleep(waitMs);
+                    continue;
+                }
+
+                const bodyText = await response.text().catch(() => "<no body>");
+                throw new Error(
+                    `HTTP 429 Too Many Requests from ${url}. Retry-After: ${retryAfterRaw || "unavailable"}. Body: ${bodyText.slice(0, 500)}`
+                );
+            }
+
+            if (!response.ok) {
+                const bodyText = await response.text().catch(() => "<no body>");
+                throw new Error(
+                    `HTTP ${response.status} ${response.statusText} from ${url}. Body: ${bodyText.slice(0, 500)}`
+                );
+            }
+
+            const contentType = (response.headers.get("content-type") || "").toLowerCase();
+            if (!contentType.includes("json")) {
+                throw new Error(`Expected JSON response from ${url}, got content-type: ${contentType || "unknown"}`);
+            }
+
+            try {
+                return await response.json();
+            } catch (error) {
+                throw new Error(`Failed parsing JSON from ${url}: ${error.message}`);
+            }
+        } catch (error) {
+            if (error.name === "AbortError") {
+                throw new Error(`Request timed out after ${timeoutMs} ms for ${url}`);
+            }
+
+            if (isRetriableNetworkError(error)) {
+                const fallbackBackoffMs = DEFAULT_429_WAIT_MS * attempt;
+                const waitMs = Math.min(MAX_RETRY_AFTER_MS, fallbackBackoffMs);
+
+                if (attempt <= MAX_429_RETRIES) {
+                    await sleep(waitMs);
+                    continue;
+                }
+
+                throw new Error(
+                    `Network error after ${MAX_429_RETRIES + 1} attempts for ${url}: ${error.message || String(error)}`
+                );
+            }
+
+            throw error;
+        } finally {
+            clearTimeout(timeoutId);
+        }
     }
+
+    throw new Error(`Unexpected retry loop termination for ${url}`);
 }
 
 function getNextLink(page) {
@@ -99,6 +177,8 @@ export async function searchStacByChunks({
 
         while (nextRequest && unique.size < maxItems) {
             pageCount += 1;
+
+            await sleep(DEFAULT_REQUEST_DELAY_MS);
 
             const init = {
                 method: nextRequest.method,
