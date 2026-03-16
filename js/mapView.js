@@ -210,7 +210,7 @@ export function renderMapData(map, {
             properties: {
                 id: String(f.id ?? ""),
                 collection: String(f.collection || "unknown"),
-                collection_color: String(f._collectionColor || "#2f6f5e")
+                collection_color: String(f._collectionColor || "#f88906")
             }
         }));
 
@@ -227,7 +227,7 @@ export function renderMapData(map, {
                 type: "line",
                 source: TRACK_SOURCE_ID,
                 paint: {
-                    "line-color": "#c84c09",
+                    "line-color": "#fbb400",
                     "line-width": 3
                 }
             });
@@ -277,7 +277,7 @@ export function renderMapData(map, {
                 type: "line",
                 source: HIGHLIGHT_SOURCE_ID,
                 paint: {
-                    "line-color": "#c84c09",
+                    "line-color": "#fbb400",
                     "line-width": 3
                 }
             });
