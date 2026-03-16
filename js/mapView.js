@@ -1,4 +1,5 @@
 import maplibregl from "https://esm.sh/maplibre-gl@4.7.1";
+import { Protocol } from "https://esm.sh/pmtiles@3.2.1";
 import { MAP_STYLE } from "./config.js";
 
 const TRACK_SOURCE_ID = "ais-track-source";
@@ -10,8 +11,21 @@ const HIGHLIGHT_SOURCE_ID = "stac-highlight-source";
 const HIGHLIGHT_LAYER_ID = "stac-highlight-layer";
 
 const interactionStateByMap = new WeakMap();
+let pmtilesProtocolRegistered = false;
+
+function ensurePmtilesProtocol() {
+    if (pmtilesProtocolRegistered) {
+        return;
+    }
+
+    const protocol = new Protocol();
+    maplibregl.addProtocol("pmtiles", protocol.tile);
+    pmtilesProtocolRegistered = true;
+}
 
 export function createMap(containerId) {
+    ensurePmtilesProtocol();
+
     const map = new maplibregl.Map({
         container: containerId,
         style: MAP_STYLE,
