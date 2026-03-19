@@ -286,6 +286,17 @@ button:disabled {
   background: var(--color-row-hover);
 }
 
+.imagery-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.imagery-actions button {
+  padding: 7px 10px;
+  font-size: 0.78rem;
+}
+
 .legend {
   margin-top: 8px;
   display: flex;

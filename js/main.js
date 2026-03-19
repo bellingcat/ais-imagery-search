@@ -188,6 +188,66 @@ function pickImageryUrl(feature) {
     return toBrowserItemUrl(selfLink?.href || "");
 }
 
+const COPERNICUS_BROWSER_CONFIG = {
+    "sentinel-2-l2a": {
+        datasetId: "S2_L2A_CDAS",
+        layerId: "1_TRUE_COLOR"
+    },
+    "sentinel-1-grd": {
+        datasetId: "S1_CDAS_IW_VVVH",
+        layerId: "8_RGB-RATIO"
+    },
+    "landsat-c2-l1-oli-tirs": {
+        datasetId: "CDAS_L8_L9_LOTL1",
+        layerId: "1_TRUE_COLOR"
+    }
+};
+
+function toDayBoundsUtc(timestamp) {
+    const parsed = new Date(String(timestamp || ""));
+    if (!Number.isFinite(parsed.getTime())) {
+        return null;
+    }
+
+    const year = parsed.getUTCFullYear();
+    const month = parsed.getUTCMonth();
+    const day = parsed.getUTCDate();
+
+    const fromTime = new Date(Date.UTC(year, month, day, 0, 0, 0, 0)).toISOString();
+    const toTime = new Date(Date.UTC(year, month, day, 23, 59, 59, 999)).toISOString();
+    return { fromTime, toTime };
+}
+
+function buildCopernicusBrowserUrl(row) {
+    const config = COPERNICUS_BROWSER_CONFIG[String(row?.collection || "").toLowerCase()];
+    if (!config) {
+        return "";
+    }
+
+    const lat = Number(row?.matched_ais_lat);
+    const lng = Number(row?.matched_ais_lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return "";
+    }
+
+    const dayBounds = toDayBoundsUtc(row?.matched_ais_timestamp || row?.matched_target_timestamp || row?.datetime);
+    if (!dayBounds) {
+        return "";
+    }
+
+    const params = new URLSearchParams({
+        zoom: "14",
+        lat: String(lat),
+        lng: String(lng),
+        datasetId: config.datasetId,
+        fromTime: dayBounds.fromTime,
+        toTime: dayBounds.toTime,
+        layerId: config.layerId
+    });
+
+    return `https://browser.dataspace.copernicus.eu/?${params.toString()}`;
+}
+
 function buildCollectionColorMap(candidates) {
     const collections = Array.from(
         new Set(candidates.map((c) => String(c.collection || "unknown")))
@@ -234,9 +294,14 @@ function buildResultRows(candidates, shortlist) {
             matched_ais_next_lat: match?.matched_ais_next_lat,
             matched_ais_next_timestamp: match?.matched_ais_next_timestamp || "",
             imagery_url: pickImageryUrl(feature),
+            copernicus_browser_url: "",
             matched: Boolean(match)
         };
     });
+
+    for (const row of rows) {
+        row.copernicus_browser_url = buildCopernicusBrowserUrl(row);
+    }
 
     rows.sort((a, b) => {
         const aMs = new Date(a.datetime || "").getTime();
@@ -321,7 +386,13 @@ function renderResultsTable(rows) {
         const hasClosestPosition = Number.isFinite(row.matched_ais_lon) && Number.isFinite(row.matched_ais_lat);
         const shipPositionCell = `<button type="button" class="ship-pos-btn" ${hasClosestPosition ? "" : "disabled"}>Download</button>`;
         const hasImageryUrl = Boolean(row.imagery_url);
-        const imageryCell = `<button type="button" class="imagery-btn" ${hasImageryUrl ? "" : "disabled"}>Open</button>`;
+        const hasCopernicusUrl = Boolean(row.copernicus_browser_url);
+        const imageryCell = `
+            <div class="imagery-actions">
+                <button type="button" class="imagery-btn" ${hasImageryUrl ? "" : "disabled"}>Open Item</button>
+                <button type="button" class="copernicus-btn" ${hasCopernicusUrl ? "" : "disabled"}>Open Browser</button>
+            </div>
+        `;
 
         tr.innerHTML = `
             <td>${row.platform || ""}</td>
@@ -354,6 +425,18 @@ function renderResultsTable(rows) {
                 }
 
                 window.open(row.imagery_url, "_blank", "noopener,noreferrer");
+            });
+        }
+
+        const copernicusBtn = tr.querySelector(".copernicus-btn");
+        if (copernicusBtn) {
+            copernicusBtn.addEventListener("click", (event) => {
+                event.stopPropagation();
+                if (!row.copernicus_browser_url) {
+                    return;
+                }
+
+                window.open(row.copernicus_browser_url, "_blank", "noopener,noreferrer");
             });
         }
 
