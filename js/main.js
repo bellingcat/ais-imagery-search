@@ -17,7 +17,6 @@ const state = {
     highlightedFeatureId: null,
     collectionColors: new Map()
 };
-
 const searchView = document.getElementById("searchView");
 const resultsView = document.getElementById("resultsView");
 const appShell = document.querySelector(".app-shell");
@@ -384,13 +383,50 @@ function renderResultsTable(rows) {
         const formattedMatchedTime = formatDisplayTimestamp(row.matched_ais_timestamp);
 
         const hasClosestPosition = Number.isFinite(row.matched_ais_lon) && Number.isFinite(row.matched_ais_lat);
-        const shipPositionCell = `<button type="button" class="ship-pos-btn" ${hasClosestPosition ? "" : "disabled"}>Download</button>`;
+        const shipPositionCell = `
+            <button
+                type="button"
+                class="ship-pos-btn icon-action-btn icon-ship"
+                aria-label="Download matched ship position"
+                title="Download matched ship position"
+                ${hasClosestPosition ? "" : "disabled"}
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M12 5v10"></path>
+                    <path d="M8.5 11.5 12 15 15.5 11.5"></path>
+                    <path d="M6 18h12"></path>
+                </svg>
+            </button>
+        `;
         const hasImageryUrl = Boolean(row.imagery_url);
         const hasCopernicusUrl = Boolean(row.copernicus_browser_url);
         const imageryCell = `
             <div class="imagery-actions">
-                <button type="button" class="imagery-btn" ${hasImageryUrl ? "" : "disabled"}>Open Item</button>
-                <button type="button" class="copernicus-btn" ${hasCopernicusUrl ? "" : "disabled"}>Open Browser</button>
+                <button
+                    type="button"
+                    class="imagery-btn icon-action-btn icon-stac"
+                    aria-label="Open STAC item"
+                    title="Open STAC item"
+                    ${hasImageryUrl ? "" : "disabled"}
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <rect class="layer-back" x="4" y="4" width="12" height="12" rx="1.5"></rect>
+                        <rect class="layer-mid" x="7" y="7" width="12" height="12" rx="1.5"></rect>
+                        <rect class="layer-front" x="10" y="10" width="10" height="10" rx="1.5"></rect>
+                    </svg>
+                </button>
+                <button
+                    type="button"
+                    class="copernicus-btn icon-action-btn icon-browser"
+                    aria-label="Open Copernicus Browser"
+                    title="Open Copernicus Browser"
+                    ${hasCopernicusUrl ? "" : "disabled"}
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <circle cx="10" cy="10" r="6"></circle>
+                        <path d="M14.5 14.5 20 20"></path>
+                    </svg>
+                </button>
             </div>
         `;
 
