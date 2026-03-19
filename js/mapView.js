@@ -11,6 +11,7 @@ const HIGHLIGHT_SOURCE_ID = "stac-highlight-source";
 const HIGHLIGHT_LAYER_ID = "stac-highlight-layer";
 
 const interactionStateByMap = new WeakMap();
+const previewPopupByMap = new WeakMap();
 let pmtilesProtocolRegistered = false;
 
 function ensurePmtilesProtocol() {
@@ -65,6 +66,181 @@ function selectHighlightFeature(footprints, featureId) {
     }
 
     return footprints.find((f) => String(f.properties?.id) === String(featureId)) || null;
+}
+
+function selectHighlightedCandidate(candidates, featureId) {
+    if (!featureId) {
+        return null;
+    }
+
+    return candidates.find((f) => String(f?.id ?? "") === String(featureId)) || null;
+}
+
+function findSelfHref(feature) {
+    const links = Array.isArray(feature?.links) ? feature.links : [];
+    const selfLink = links.find((entry) => String(entry?.rel || "").toLowerCase() === "self" && entry?.href);
+    return selfLink?.href || "";
+}
+
+function toAbsoluteHref(href, baseHref) {
+    const raw = String(href || "").trim();
+    if (!raw) {
+        return "";
+    }
+
+    try {
+        return new URL(raw, baseHref || window.location.href).toString();
+    } catch {
+        return "";
+    }
+}
+
+function isBrowserLoadableImageUrl(url) {
+    return /^https?:\/\//i.test(String(url || "").trim());
+}
+
+function isLikelyImageAsset(entry) {
+    const type = String(entry?.type || "").toLowerCase();
+    if (type.startsWith("image/")) {
+        return true;
+    }
+
+    const href = String(entry?.href || "").toLowerCase();
+    return /\.(png|jpe?g|webp|gif)(\?|$)/.test(href);
+}
+
+function assetRank(entry, key) {
+    const keyText = String(key || "").toLowerCase();
+    const roles = Array.isArray(entry?.roles)
+        ? entry.roles.map((role) => String(role).toLowerCase())
+        : [];
+    const rankMap = [
+        { needle: "thumbnail", score: 0 },
+        { needle: "quicklook", score: 1 },
+        { needle: "overview", score: 2 },
+        { needle: "preview", score: 3 },
+        { needle: "browse", score: 4 },
+        { needle: "visual", score: 5 }
+    ];
+
+    for (const { needle, score } of rankMap) {
+        if (keyText.includes(needle) || roles.some((role) => role.includes(needle))) {
+            return score;
+        }
+    }
+
+    return 99;
+}
+
+function resolvePreviewImage(feature) {
+    const selfHref = findSelfHref(feature);
+    const links = Array.isArray(feature?.links) ? feature.links : [];
+    const previewLink = links.find((entry) => {
+        const rel = String(entry?.rel || "").toLowerCase();
+        return entry?.href && (rel === "preview" || rel === "icon");
+    });
+
+    if (previewLink?.href) {
+        const resolved = toAbsoluteHref(previewLink.href, selfHref);
+        if (resolved && isBrowserLoadableImageUrl(resolved)) {
+            return resolved;
+        }
+    }
+
+    const assets = feature?.assets && typeof feature.assets === "object" ? feature.assets : {};
+    const candidates = Object.entries(assets)
+        .filter(([, entry]) => entry?.href && isLikelyImageAsset(entry))
+        .map(([key, entry]) => ({ key, entry }))
+        .sort((a, b) => assetRank(a.entry, a.key) - assetRank(b.entry, b.key));
+
+    if (!candidates.length) {
+        return "";
+    }
+
+    const resolved = toAbsoluteHref(candidates[0].entry.href, selfHref);
+    return isBrowserLoadableImageUrl(resolved) ? resolved : "";
+}
+
+function buildPreviewPopupContent(feature, previewUrl) {
+    const root = document.createElement("div");
+    root.className = "map-preview-card";
+
+    const imageWrap = document.createElement("div");
+    imageWrap.className = "map-preview-image-wrap";
+
+    if (previewUrl) {
+        const img = document.createElement("img");
+        img.className = "map-preview-image";
+        img.src = previewUrl;
+        img.alt = `Preview for ${String(feature?.collection || "imagery item")}`;
+        img.loading = "lazy";
+        img.addEventListener("error", () => {
+            imageWrap.innerHTML = "";
+            const empty = document.createElement("div");
+            empty.className = "map-preview-empty";
+            empty.textContent = "No thumbnail found";
+            imageWrap.appendChild(empty);
+        });
+        imageWrap.appendChild(img);
+    } else {
+        const empty = document.createElement("div");
+        empty.className = "map-preview-empty";
+        empty.textContent = "No thumbnail found";
+        imageWrap.appendChild(empty);
+    }
+
+    root.appendChild(imageWrap);
+
+    const caption = document.createElement("div");
+    caption.className = "map-preview-caption";
+    const collection = String(feature?.collection || "").trim();
+    const dt = String(feature?.properties?.datetime || feature?.properties?.start_datetime || "").trim();
+    caption.textContent = [collection, dt].filter(Boolean).join(" | ");
+    root.appendChild(caption);
+
+    return root;
+}
+
+function updatePreviewPopup(map, highlightFeature, highlightedCandidate) {
+    const existing = previewPopupByMap.get(map);
+
+    if (!highlightFeature || !highlightedCandidate) {
+        if (existing) {
+            existing.remove();
+            previewPopupByMap.delete(map);
+        }
+        return;
+    }
+
+    const previewUrl = resolvePreviewImage(highlightedCandidate);
+    const center = centerOfGeometry(highlightFeature.geometry);
+    if (!center) {
+        if (existing) {
+            existing.remove();
+            previewPopupByMap.delete(map);
+        }
+        return;
+    }
+
+    const content = buildPreviewPopupContent(highlightedCandidate, previewUrl);
+
+    if (existing) {
+        existing.setLngLat(center).setDOMContent(content);
+        return;
+    }
+
+    const popup = new maplibregl.Popup({
+        className: "preview-popup",
+        closeButton: false,
+        closeOnClick: false,
+        maxWidth: "230px",
+        offset: 16
+    })
+        .setLngLat(center)
+        .setDOMContent(content)
+        .addTo(map);
+
+    previewPopupByMap.set(map, popup);
 }
 
 function ensureInteractionHandlers(map, onHover, onClick) {
@@ -215,6 +391,7 @@ export function renderMapData(map, {
         }));
 
     const highlightFeature = selectHighlightFeature(footprints, highlightedId);
+    const highlightedCandidate = selectHighlightedCandidate(candidates, highlightedId);
 
     const draw = () => {
         const trackSource = map.getSource(TRACK_SOURCE_ID);
@@ -295,6 +472,8 @@ export function renderMapData(map, {
                 });
             }
         }
+
+        updatePreviewPopup(map, highlightFeature, highlightedCandidate);
     };
 
     if (map.isStyleLoaded()) {
