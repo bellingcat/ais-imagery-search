@@ -1,6 +1,6 @@
 import { DEFAULTS } from "./config.js";
 import { parseAisCsv } from "./csvParser.js";
-import { buildQueryTrack, chunkToLineString, splitPointsByDays } from "./track.js";
+import { chunkToLineString, splitPointsByDays } from "./track.js";
 import { searchStacByChunks } from "./stacClient.js";
 import { shortlistFeatures } from "./shortlist.js";
 import { createMap, renderMapData } from "./mapView.js";
@@ -584,8 +584,8 @@ async function runMatching() {
             timeColumn: settings.timeColumn
         });
 
-        const queryTrack = buildQueryTrack(state.points, settings.maxQueryPoints);
-        state.chunks = splitPointsByDays(queryTrack, settings.chunkDays);
+        // Keep full temporal granularity for chunk windows; downsample inside each chunk only.
+        state.chunks = splitPointsByDays(state.points, settings.chunkDays);
 
         setStatus("Searching STAC by chunk and pagination...");
         state.candidates = await searchStacByChunks({
