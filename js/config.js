@@ -16,6 +16,10 @@ export const DEFAULTS = {
 export const PLANET = {
     // Planet Data API STAC service (beta).
     searchUrl: "https://api.planet.com/x/data/search",
+    // Planet's CQL2 rejects `datetime`; acquisition time is filtered as `acquired`.
+    timeProperty: "acquired",
+    segmentMinutes: 60,
+    maxPointsPerSegment: 20,
     collections: {
         planetscope: "PSScene",
         skysat: "SkySatScene",

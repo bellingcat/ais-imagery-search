@@ -149,6 +149,8 @@ export async function searchStacByChunks({
     chunkToLineString,
     getAuthHeaders,
     extraBody,
+    buildChunkFilter,
+    temporalPaddingMs = 0,
     onProgress
 }) {
     const timeoutMs = timeoutSeconds * 1000;
@@ -161,21 +163,27 @@ export async function searchStacByChunks({
         }
 
         const line = chunkToLineString(chunk, maxQueryPoints);
-        const start = chunk[0].ts;
-        const end = chunk[chunk.length - 1].ts;
+        const start = new Date(chunk[0].ts.getTime() - temporalPaddingMs);
+        const end = new Date(chunk[chunk.length - 1].ts.getTime() + temporalPaddingMs);
         const datetime = `${toIsoZ(start)}/${toIsoZ(end)}`;
+
+        const body = {
+            ...(extraBody || {}),
+            collections,
+            intersects: line.geometry,
+            datetime,
+            limit: stacPageLimit
+        };
+        if (typeof buildChunkFilter === "function") {
+            const chunkFilter = buildChunkFilter(chunk);
+            body.filter = body.filter ? { op: "and", args: [body.filter, chunkFilter] } : chunkFilter;
+        }
 
         let pageCount = 0;
         let nextRequest = {
             url: stacUrl,
             method: "POST",
-            body: {
-                ...(extraBody || {}),
-                collections,
-                intersects: line.geometry,
-                datetime,
-                limit: stacPageLimit
-            }
+            body
         };
 
         while (nextRequest && unique.size < maxItems) {

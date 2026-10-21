@@ -362,6 +362,14 @@ button:disabled {
   color: #fff;
 }
 
+.controls-panel p.results-warning {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-left: 4px solid var(--color-accent);
+  background: var(--color-focus);
+  font-size: 0.85rem;
+}
+
 .legend {
   margin-top: 8px;
   display: flex;

@@ -1,6 +1,6 @@
 import { DEFAULTS, PLANET } from "./config.js";
 import { parseAisCsv } from "./csvParser.js";
-import { chunkToLineString, splitPointsByDays } from "./track.js";
+import { buildSpatioTemporalFilter, chunkToLineString, splitPointsByDays } from "./track.js";
 import { searchStacByChunks } from "./stacClient.js";
 import {
     clearPlanetAccessToken,
@@ -39,6 +39,7 @@ const resultsTbody = document.getElementById("resultsTbody");
 const resultsLegend = document.getElementById("resultsLegend");
 const resultCandidates = document.getElementById("resultCandidates");
 const resultShortlist = document.getElementById("resultShortlist");
+const resultsWarning = document.getElementById("resultsWarning");
 
 const metricPoints = document.getElementById("metricPoints");
 const metricChunks = document.getElementById("metricChunks");
@@ -386,6 +387,8 @@ function clearCurrentSearch() {
     renderLegend(state.collectionColors);
     resultCandidates.textContent = "0";
     resultShortlist.textContent = "0";
+    resultsWarning.textContent = "";
+    resultsWarning.classList.add("hidden");
 
     jsonBtn.disabled = true;
     csvBtn.disabled = true;
@@ -681,6 +684,7 @@ async function runMatching() {
         };
 
         state.candidates = [];
+        const truncatedSources = [];
         if (settings.collections.length > 0) {
             state.candidates = await searchStacByChunks({
                 ...searchOptions,
@@ -688,6 +692,9 @@ async function runMatching() {
                 collections: settings.collections,
                 onProgress: progressFor("STAC")
             });
+            if (state.candidates.length >= settings.maxItems) {
+                truncatedSources.push("Copernicus");
+            }
         }
 
         if (settings.planetCollections.length > 0) {
@@ -697,13 +704,29 @@ async function runMatching() {
                 collections: settings.planetCollections,
                 getAuthHeaders: () => planetAuthHeaders(),
                 extraBody: settings.planetFilter ? { filter: settings.planetFilter } : undefined,
+                buildChunkFilter: (chunk) => buildSpatioTemporalFilter(chunk, {
+                    segmentMinutes: PLANET.segmentMinutes,
+                    temporalBufferMinutes: settings.temporalBufferMinutes,
+                    spatialBufferMeters: settings.spatialBufferMeters,
+                    maxPointsPerSegment: PLANET.maxPointsPerSegment,
+                    timeProperty: PLANET.timeProperty
+                }),
+                temporalPaddingMs: settings.temporalBufferMinutes * 60 * 1000,
                 onProgress: progressFor("Planet")
             });
             for (const feature of planetFeatures) {
                 feature._source = "planet";
             }
+            if (planetFeatures.length >= settings.maxItems) {
+                truncatedSources.push("Planet");
+            }
             state.candidates = state.candidates.concat(planetFeatures);
         }
+
+        resultsWarning.textContent = truncatedSources.length
+            ? `${truncatedSources.join(" and ")} search stopped at the max candidate limit (${settings.maxItems}); later parts of the track may not have been searched. Raise "Max candidate items" in Advanced search options to search further.`
+            : "";
+        resultsWarning.classList.toggle("hidden", truncatedSources.length === 0);
 
         setStatus("Running shortlist temporal and spatial checks...");
         state.shortlist = await shortlistFeatures({
