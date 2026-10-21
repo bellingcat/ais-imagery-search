@@ -1,7 +1,14 @@
-import { DEFAULTS } from "./config.js";
+import { DEFAULTS, PLANET } from "./config.js";
 import { parseAisCsv } from "./csvParser.js";
 import { chunkToLineString, splitPointsByDays } from "./track.js";
 import { searchStacByChunks } from "./stacClient.js";
+import {
+    clearPlanetAccessToken,
+    getPlanetTokenExpiry,
+    isPlanetAuthenticated,
+    planetAuthHeaders,
+    setPlanetAccessToken
+} from "./planetAuth.js";
 import { shortlistFeatures } from "./shortlist.js";
 import { createMap, renderMapData } from "./mapView.js";
 import { downloadCsv, downloadJson, downloadShipPositionGeoJson } from "./exporters.js";
@@ -37,6 +44,17 @@ const metricPoints = document.getElementById("metricPoints");
 const metricChunks = document.getElementById("metricChunks");
 const metricCandidates = document.getElementById("metricCandidates");
 const metricShortlist = document.getElementById("metricShortlist");
+
+const planetAuthStatus = document.getElementById("planetAuthStatus");
+const planetTokenInput = document.getElementById("planetTokenInput");
+const planetTokenSaveBtn = document.getElementById("planetTokenSaveBtn");
+const planetTokenClearBtn = document.getElementById("planetTokenClearBtn");
+const planetCheckboxes = {
+    planetscope: document.getElementById("collectionPlanetScope"),
+    skysat: document.getElementById("collectionSkySat"),
+    pelican: document.getElementById("collectionPelican")
+};
+const PLANET_DEFAULT_CHECKED = { planetscope: true, skysat: true, pelican: false };
 
 const map = createMap("map");
 
@@ -182,6 +200,9 @@ function toBrowserItemUrl(selfHref) {
 }
 
 function pickImageryUrl(feature) {
+    if (feature?._source === "planet") {
+        return "";
+    }
     const links = Array.isArray(feature?.links) ? feature.links : [];
     const selfLink = links.find((entry) => String(entry?.rel || "").toLowerCase() === "self" && entry?.href);
     return toBrowserItemUrl(selfLink?.href || "");
@@ -279,6 +300,7 @@ function buildResultRows(candidates, shortlist) {
         const match = shortlistById.get(featureId);
         return {
             id: featureId,
+            source: String(feature._source || ""),
             collection: String(feature.collection || ""),
             datetime: featureDateTime(feature),
             platform: String(feature?.properties?.platform || ""),
@@ -400,8 +422,20 @@ function renderResultsTable(rows) {
         `;
         const hasImageryUrl = Boolean(row.imagery_url);
         const hasCopernicusUrl = Boolean(row.copernicus_browser_url);
-        const imageryCell = `
-            <div class="imagery-actions">
+        const primaryImageryButton = row.source === "planet"
+            ? `
+                <button
+                    type="button"
+                    class="copy-id-btn icon-action-btn"
+                    aria-label="Copy scene ID"
+                    title="Copy scene ID"
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <rect x="8" y="8" width="12" height="12" rx="1.5"></rect>
+                        <path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"></path>
+                    </svg>
+                </button>`
+            : `
                 <button
                     type="button"
                     class="imagery-btn icon-action-btn icon-stac"
@@ -414,7 +448,10 @@ function renderResultsTable(rows) {
                         <rect class="layer-mid" x="7" y="7" width="12" height="12" rx="1.5"></rect>
                         <rect class="layer-front" x="10" y="10" width="10" height="10" rx="1.5"></rect>
                     </svg>
-                </button>
+                </button>`;
+        const imageryCell = `
+            <div class="imagery-actions">
+                ${primaryImageryButton}
                 <button
                     type="button"
                     class="copernicus-btn icon-action-btn icon-browser"
@@ -461,6 +498,25 @@ function renderResultsTable(rows) {
                 }
 
                 window.open(row.imagery_url, "_blank", "noopener,noreferrer");
+            });
+        }
+
+        const copyIdBtn = tr.querySelector(".copy-id-btn");
+        if (copyIdBtn) {
+            copyIdBtn.addEventListener("click", async (event) => {
+                event.stopPropagation();
+                try {
+                    await navigator.clipboard.writeText(row.id);
+                    copyIdBtn.title = "Copied";
+                    copyIdBtn.classList.add("copied");
+                    setTimeout(() => {
+                        copyIdBtn.title = "Copy scene ID";
+                        copyIdBtn.classList.remove("copied");
+                    }, 1500);
+                } catch (error) {
+                    setStatus("Copy failed");
+                    setProgress(`Could not copy scene ID ${row.id}: ${error.message || String(error)}`);
+                }
             });
         }
 
@@ -515,6 +571,18 @@ function prepareResultsView() {
     rerenderMap(true);
 }
 
+function parsePlanetFilter(value) {
+    const text = String(value || "").trim();
+    if (!text) {
+        return null;
+    }
+    try {
+        return JSON.parse(text);
+    } catch (error) {
+        throw new Error(`Planet CQL2 filter must be valid JSON: ${error.message}`);
+    }
+}
+
 function readSettings() {
     const file = document.getElementById("csvFile").files?.[0];
     assert(file, "Please select a CSV file.");
@@ -532,7 +600,15 @@ function readSettings() {
 
     const additionalCollections = splitCsvList(document.getElementById("additionalCollections")?.value || "");
     const collections = Array.from(new Set([...selectedCollections, ...additionalCollections]));
-    assert(collections.length > 0, "At least one collection is required.");
+
+    const planetCollections = Object.entries(planetCheckboxes)
+        .filter(([, checkbox]) => checkbox?.checked)
+        .map(([key]) => PLANET.collections[key]);
+    if (planetCollections.length > 0 && !isPlanetAuthenticated()) {
+        updatePlanetUi();
+        throw new Error("Planet access token is missing or expired. Paste a new one to search Planet.");
+    }
+    assert(collections.length + planetCollections.length > 0, "At least one collection is required.");
 
     const settings = {
         file,
@@ -540,6 +616,9 @@ function readSettings() {
         latColumn: document.getElementById("latColumn").value.trim(),
         timeColumn: document.getElementById("timeColumn").value.trim(),
         collections,
+        planetCollections,
+        planetSearchUrl: document.getElementById("planetSearchUrl").value.trim() || PLANET.searchUrl,
+        planetFilter: parsePlanetFilter(document.getElementById("planetFilter").value),
         stacUrl: document.getElementById("stacUrl").value.trim() || DEFAULTS.stacUrl,
         temporalBufferMinutes: toFiniteNumber(
             document.getElementById("temporalBufferMinutes").value,
@@ -588,20 +667,43 @@ async function runMatching() {
         state.chunks = splitPointsByDays(state.points, settings.chunkDays);
 
         setStatus("Searching STAC by chunk and pagination...");
-        state.candidates = await searchStacByChunks({
-            stacUrl: settings.stacUrl,
+        const searchOptions = {
             chunks: state.chunks,
-            collections: settings.collections,
             stacPageLimit: settings.stacPageLimit,
             maxItems: settings.maxItems,
             timeoutSeconds: settings.timeoutSeconds,
             maxQueryPoints: settings.maxQueryPoints,
-            chunkToLineString,
-            onProgress: ({ chunkIndex, totalChunks, pageCount, uniqueCandidates }) => {
-                setProgress(`STAC: chunk ${chunkIndex}/${totalChunks}, page ${pageCount}, unique ${uniqueCandidates}`);
-                metricCandidates.textContent = String(uniqueCandidates);
+            chunkToLineString
+        };
+        const progressFor = (label) => ({ chunkIndex, totalChunks, pageCount, uniqueCandidates }) => {
+            setProgress(`${label}: chunk ${chunkIndex}/${totalChunks}, page ${pageCount}, unique ${uniqueCandidates}`);
+            metricCandidates.textContent = String(uniqueCandidates);
+        };
+
+        state.candidates = [];
+        if (settings.collections.length > 0) {
+            state.candidates = await searchStacByChunks({
+                ...searchOptions,
+                stacUrl: settings.stacUrl,
+                collections: settings.collections,
+                onProgress: progressFor("STAC")
+            });
+        }
+
+        if (settings.planetCollections.length > 0) {
+            const planetFeatures = await searchStacByChunks({
+                ...searchOptions,
+                stacUrl: settings.planetSearchUrl,
+                collections: settings.planetCollections,
+                getAuthHeaders: () => planetAuthHeaders(),
+                extraBody: settings.planetFilter ? { filter: settings.planetFilter } : undefined,
+                onProgress: progressFor("Planet")
+            });
+            for (const feature of planetFeatures) {
+                feature._source = "planet";
             }
-        });
+            state.candidates = state.candidates.concat(planetFeatures);
+        }
 
         setStatus("Running shortlist temporal and spatial checks...");
         state.shortlist = await shortlistFeatures({
@@ -636,7 +738,12 @@ async function runMatching() {
 
 form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    await runMatching();
+    try {
+        await runMatching();
+    } catch (error) {
+        setStatus("Failed");
+        setProgress(error.message || String(error));
+    }
 });
 
 jsonBtn.addEventListener("click", () => {
@@ -658,3 +765,47 @@ setStatus("Idle");
 setProgress("Ready. Load AIS CSV to begin.");
 showSearchView();
 initPaneResizer();
+
+function updatePlanetUi({ applyDefaults = false } = {}) {
+    const authenticated = isPlanetAuthenticated();
+    const expiresAt = getPlanetTokenExpiry();
+    planetAuthStatus.textContent = authenticated
+        ? `Access token set, expires ${formatDisplayTimestamp(new Date(expiresAt).toISOString())} UTC`
+        : expiresAt ? "Access token expired. Paste a new one." : "No token set";
+    planetTokenClearBtn.classList.toggle("hidden", !expiresAt && !authenticated);
+
+    for (const [key, checkbox] of Object.entries(planetCheckboxes)) {
+        checkbox.disabled = !authenticated;
+        if (!authenticated) {
+            checkbox.checked = false;
+        } else if (applyDefaults) {
+            checkbox.checked = PLANET_DEFAULT_CHECKED[key];
+        }
+    }
+}
+
+function applyPlanetToken() {
+    try {
+        setPlanetAccessToken(planetTokenInput.value);
+        planetTokenInput.value = "";
+        updatePlanetUi({ applyDefaults: true });
+    } catch (error) {
+        setStatus("Planet token rejected");
+        setProgress(error.message || String(error));
+    }
+}
+
+planetTokenSaveBtn.addEventListener("click", applyPlanetToken);
+planetTokenInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+        event.preventDefault();
+        applyPlanetToken();
+    }
+});
+
+planetTokenClearBtn.addEventListener("click", () => {
+    clearPlanetAccessToken();
+    updatePlanetUi();
+});
+
+updatePlanetUi({ applyDefaults: true });

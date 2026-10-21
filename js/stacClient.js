@@ -147,6 +147,8 @@ export async function searchStacByChunks({
     timeoutSeconds,
     maxQueryPoints,
     chunkToLineString,
+    getAuthHeaders,
+    extraBody,
     onProgress
 }) {
     const timeoutMs = timeoutSeconds * 1000;
@@ -168,6 +170,7 @@ export async function searchStacByChunks({
             url: stacUrl,
             method: "POST",
             body: {
+                ...(extraBody || {}),
                 collections,
                 intersects: line.geometry,
                 datetime,
@@ -182,7 +185,10 @@ export async function searchStacByChunks({
 
             const init = {
                 method: nextRequest.method,
-                headers: buildHeaders()
+                headers: {
+                    ...buildHeaders(),
+                    ...(typeof getAuthHeaders === "function" ? await getAuthHeaders() : {})
+                }
             };
 
             if (nextRequest.method === "POST") {
@@ -217,10 +223,14 @@ export async function searchStacByChunks({
             } else {
                 const method = normalizeMethod(next.method);
                 const resolvedHref = new URL(next.href, nextRequest.url).toString();
+                let nextBody;
+                if (method === "POST") {
+                    nextBody = next.merge ? { ...(nextRequest.body || {}), ...(next.body || {}) } : next.body || {};
+                }
                 nextRequest = {
                     url: resolvedHref,
                     method,
-                    body: method === "POST" ? next.body || {} : undefined
+                    body: nextBody
                 };
             }
 

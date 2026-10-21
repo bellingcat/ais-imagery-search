@@ -13,4 +13,14 @@ export const DEFAULTS = {
     maxItems: 1200
 };
 
+export const PLANET = {
+    // Planet Data API STAC service (beta).
+    searchUrl: "https://api.planet.com/x/data/search",
+    collections: {
+        planetscope: "PSScene",
+        skysat: "SkySatScene",
+        pelican: "PelicanScene"
+    }
+};
+
 export const MAP_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";

@@ -44,6 +44,31 @@
           </label>
         </fieldset>
 
+        <fieldset id="planetFieldset" class="collection-fieldset planet-fieldset span-2">
+          <legend>Planet (requires access token)</legend>
+          <div class="planet-auth-row">
+            <label class="planet-token-label">
+              Planet access token
+              <input id="planetTokenInput" type="password" autocomplete="off" spellcheck="false" placeholder="Output of: planet auth print-access-token" />
+            </label>
+            <button id="planetTokenSaveBtn" type="button">Use token</button>
+            <button id="planetTokenClearBtn" type="button" class="secondary-btn hidden">Clear</button>
+            <span id="planetAuthStatus">No token set</span>
+          </div>
+          <label class="checkbox-label">
+            <input id="collectionPlanetScope" type="checkbox" disabled />
+            PlanetScope
+          </label>
+          <label class="checkbox-label">
+            <input id="collectionSkySat" type="checkbox" disabled />
+            SkySat
+          </label>
+          <label class="checkbox-label">
+            <input id="collectionPelican" type="checkbox" disabled />
+            Pelican
+          </label>
+        </fieldset>
+
         <details class="advanced-options span-2">
           <summary>Advanced search options</summary>
           <div class="advanced-grid">
@@ -55,6 +80,16 @@
             <label class="span-2">
               Additional collections (comma-separated)
               <input id="additionalCollections" type="text" value="" placeholder="Example: ccm-optical, ccm-sar" />
+            </label>
+
+            <label class="span-2">
+              Planet STAC search URL
+              <input id="planetSearchUrl" type="url" value="https://api.planet.com/x/data/search" />
+            </label>
+
+            <label class="span-2">
+              Planet CQL2 filter (cql2-json, optional)
+              <input id="planetFilter" type="text" value="" placeholder='Example: {"op": ">=", "args": [{"property": "clear_percent"}, 50]}' />
             </label>
 
             <label>

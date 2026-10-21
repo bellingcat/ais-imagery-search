@@ -1,6 +1,7 @@
 import maplibregl from "https://esm.sh/maplibre-gl@4.7.1";
 import { Protocol } from "https://esm.sh/pmtiles@3.2.1";
 import { MAP_STYLE } from "./config.js";
+import { planetAuthHeaders } from "./planetAuth.js";
 
 const TRACK_SOURCE_ID = "ais-track-source";
 const TRACK_LAYER_ID = "ais-track-layer";
@@ -12,6 +13,8 @@ const HIGHLIGHT_LAYER_ID = "stac-highlight-layer";
 
 const interactionStateByMap = new WeakMap();
 const previewPopupByMap = new WeakMap();
+const authedPreviewCache = new Map();
+const AUTHED_PREVIEW_CACHE_LIMIT = 50;
 let pmtilesProtocolRegistered = false;
 
 function ensurePmtilesProtocol() {
@@ -99,6 +102,45 @@ function isBrowserLoadableImageUrl(url) {
     return /^https?:\/\//i.test(String(url || "").trim());
 }
 
+// Only ever send Planet credentials to Planet hosts over HTTPS.
+function needsPlanetAuth(feature, url) {
+    if (feature?._source !== "planet") {
+        return false;
+    }
+    try {
+        const { protocol, hostname } = new URL(url);
+        return protocol === "https:" && (hostname === "planet.com" || hostname.endsWith(".planet.com"));
+    } catch {
+        return false;
+    }
+}
+
+function loadAuthedPreview(url) {
+    if (authedPreviewCache.has(url)) {
+        return authedPreviewCache.get(url);
+    }
+
+    const pending = Promise.resolve()
+        .then(() => fetch(url, { headers: planetAuthHeaders() }))
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status} loading thumbnail`);
+            }
+            return response.blob();
+        })
+        .then((blob) => URL.createObjectURL(blob));
+    // Drop failures so a later attempt (e.g. after pasting a new token) can retry.
+    pending.catch(() => authedPreviewCache.delete(url));
+
+    authedPreviewCache.set(url, pending);
+    if (authedPreviewCache.size > AUTHED_PREVIEW_CACHE_LIMIT) {
+        const [oldestUrl, oldest] = authedPreviewCache.entries().next().value;
+        authedPreviewCache.delete(oldestUrl);
+        oldest.then((objectUrl) => URL.revokeObjectURL(objectUrl), () => { });
+    }
+    return pending;
+}
+
 function isLikelyImageAsset(entry) {
     const type = String(entry?.type || "").toLowerCase();
     if (type.startsWith("image/")) {
@@ -171,16 +213,23 @@ function buildPreviewPopupContent(feature, previewUrl) {
     if (previewUrl) {
         const img = document.createElement("img");
         img.className = "map-preview-image";
-        img.src = previewUrl;
         img.alt = `Preview for ${String(feature?.collection || "imagery item")}`;
         img.loading = "lazy";
-        img.addEventListener("error", () => {
+        const showEmpty = () => {
             imageWrap.innerHTML = "";
             const empty = document.createElement("div");
             empty.className = "map-preview-empty";
             empty.textContent = "No thumbnail found";
             imageWrap.appendChild(empty);
-        });
+        };
+        img.addEventListener("error", showEmpty);
+        if (needsPlanetAuth(feature, previewUrl)) {
+            loadAuthedPreview(previewUrl).then((objectUrl) => {
+                img.src = objectUrl;
+            }, showEmpty);
+        } else {
+            img.src = previewUrl;
+        }
         imageWrap.appendChild(img);
     } else {
         const empty = document.createElement("div");

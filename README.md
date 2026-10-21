@@ -30,6 +30,12 @@ Data flow mirrors the algorithm loop structure:
 7. Render AIS track and matched footprints on MapLibre.
 8. Export shortlist rows as JSON or CSV.
 
+## Planet search
+
+PlanetScope (`PSScene`), SkySat (`SkySatScene`) and Pelican (`PelicanScene`) scenes are searched via the Planet Data API's beta STAC service (`https://api.planet.com/x/data/search`, see https://docs.planet.com/develop/apis/data/stac/) using a Planet access token pasted into the app.
+
+- Get an access token from the Planet CLI (`planet auth login`, then `planet auth print-access-token`) The token is kept in session storage for the current tab only and must be replaced when it expires.
+
 ## Run
 
 Open `index.html` in a modern browser, or serve this directory with a static file server.
